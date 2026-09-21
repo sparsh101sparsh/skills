@@ -456,6 +456,229 @@ async function main() {
     });
   }
 
+  // Test 11: Table Edge Cases (rows-only, headers-only, null-cell sanitation, empty tables)
+  await runTest('Table Edge Cases (rows-only, headers-only, null-cell sanitation)', async () => {
+    const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
+
+    // 1. Rows-only table (headerless)
+    const rowsOnlySpec = {
+      slides: [
+        {
+          type: "table",
+          title: "Headerless Table",
+          rows: [
+            ["Metric A", "100ms"],
+            ["Metric B", "200ms"]
+          ]
+        }
+      ]
+    };
+    const rowsOnlyJson = path.join(tempDir, 'rows_only.json');
+    const rowsOnlyPptx = path.join(tempDir, 'rows_only.pptx');
+    fs.writeFileSync(rowsOnlyJson, JSON.stringify(rowsOnlySpec));
+    execSync(`node "${quickGenScript}" "${rowsOnlyJson}" "${rowsOnlyPptx}"`, {
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+    const infoRows = await validatePptxFile(rowsOnlyPptx, 1);
+    const zipRows = await JSZip.loadAsync(fs.readFileSync(rowsOnlyPptx));
+    const slide1RowsXml = await zipRows.file('ppt/slides/slide1.xml').async('text');
+    if (!slide1RowsXml.includes('a:tbl')) {
+      throw new Error('Headerless table was not generated into slide XML');
+    }
+
+    // 2. Headers-only table
+    const headersOnlySpec = {
+      slides: [
+        {
+          type: "table",
+          title: "Headers Only",
+          headers: ["Col 1", "Col 2"]
+        }
+      ]
+    };
+    const headersOnlyJson = path.join(tempDir, 'headers_only.json');
+    const headersOnlyPptx = path.join(tempDir, 'headers_only.pptx');
+    fs.writeFileSync(headersOnlyJson, JSON.stringify(headersOnlySpec));
+    execSync(`node "${quickGenScript}" "${headersOnlyJson}" "${headersOnlyPptx}"`, {
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+    await validatePptxFile(headersOnlyPptx, 1);
+    const zipHeaders = await JSZip.loadAsync(fs.readFileSync(headersOnlyPptx));
+    const slide1HeadersXml = await zipHeaders.file('ppt/slides/slide1.xml').async('text');
+    if (!slide1HeadersXml.includes('a:tbl')) {
+      throw new Error('Headers-only table was not generated into slide XML');
+    }
+
+    // 3. Null cell sanitation (must not output literal <a:t>null</a:t>)
+    const nullCellSpec = {
+      slides: [
+        {
+          type: "table",
+          title: "Sanitized Table",
+          headers: ["Key", "Value"],
+          rows: [
+            ["Latency", null],
+            [null, "15ms"]
+          ]
+        }
+      ]
+    };
+    const nullCellJson = path.join(tempDir, 'null_cell.json');
+    const nullCellPptx = path.join(tempDir, 'null_cell.pptx');
+    fs.writeFileSync(nullCellJson, JSON.stringify(nullCellSpec));
+    execSync(`node "${quickGenScript}" "${nullCellJson}" "${nullCellPptx}"`, {
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+    const zipNullCell = await JSZip.loadAsync(fs.readFileSync(nullCellPptx));
+    const slide1NullXml = await zipNullCell.file('ppt/slides/slide1.xml').async('text');
+    if (slide1NullXml.includes('<a:t>null</a:t>')) {
+      throw new Error('Found unsanitized literal <a:t>null</a:t> in generated table cell');
+    }
+
+    // 4. Empty table dimensions (headers: [], rows: []) - must not crash
+    const emptyTableSpec = {
+      slides: [
+        {
+          type: "table",
+          title: "Empty Table Slide",
+          headers: [],
+          rows: []
+        }
+      ]
+    };
+    const emptyTableJson = path.join(tempDir, 'empty_table.json');
+    const emptyTablePptx = path.join(tempDir, 'empty_table.pptx');
+    fs.writeFileSync(emptyTableJson, JSON.stringify(emptyTableSpec));
+    execSync(`node "${quickGenScript}" "${emptyTableJson}" "${emptyTablePptx}"`, {
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+    await validatePptxFile(emptyTablePptx, 1);
+
+    return `Verified rows-only, headers-only, null-cell sanitation, empty tables`;
+  });
+
+  // Test 12: Resilient Element & Boundary Handling (null/primitive items, large counts)
+  await runTest('Resilient Boundary Handling (null cards/stats/bullets, high counts)', async () => {
+    const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
+
+    const edgeSpec = {
+      title: "Resilience Spec",
+      slides: [
+        null, // should be skipped safely
+        {
+          type: "cards",
+          title: "Mixed Cards",
+          cards: [
+            null,
+            { title: "Active Card", text: "Healthy text" },
+            "Plain string card",
+            undefined
+          ]
+        },
+        {
+          type: "stats",
+          title: "Mixed Stats",
+          stats: [
+            null,
+            { value: "42k", label: "QPS", change: 0 },
+            { value: "99.9%", label: "SLA", change: "Optimal" },
+            undefined
+          ]
+        },
+        {
+          type: "bullets",
+          title: "Mixed Bullets",
+          bullets: [
+            null,
+            "First takeaway",
+            12345,
+            { text: "Object takeaway", fontSize: 14 },
+            undefined
+          ]
+        },
+        {
+          type: "cards",
+          title: "High Card Density",
+          cards: Array.from({ length: 12 }, (_, i) => ({ title: `Tier ${i + 1}`, text: `Description ${i + 1}` }))
+        }
+      ]
+    };
+
+    const edgeJson = path.join(tempDir, 'edge_spec.json');
+    const edgePptx = path.join(tempDir, 'edge_spec.pptx');
+    fs.writeFileSync(edgeJson, JSON.stringify(edgeSpec));
+
+    execSync(`node "${quickGenScript}" "${edgeJson}" "${edgePptx}"`, {
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+
+    const info = await validatePptxFile(edgePptx, 4);
+    return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides verified`;
+  });
+
+  // Test 13: Large Dataset & AutoPage Stress Test (50+ slides with auto-paginating tables)
+  await runTest('Large Dataset & Stress Test (50+ slides, multi-page tables, charts)', async () => {
+    const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
+
+    const stressSpec = {
+      title: "Enterprise Large-Scale Stress Presentation",
+      slides: []
+    };
+
+    for (let i = 1; i <= 50; i++) {
+      if (i % 3 === 1) {
+        stressSpec.slides.push({
+          type: "cards",
+          title: `Architecture Module ${i}`,
+          cards: [
+            { title: "Service Mesh", text: "Decentralized control plane" },
+            { title: "Data Storage", text: "Immutable append-only ledger" }
+          ]
+        });
+      } else if (i % 3 === 2) {
+        stressSpec.slides.push({
+          type: "stats",
+          title: `Telemetry Pod ${i}`,
+          stats: [
+            { value: `${i * 10}ms`, label: "P99", change: "-2ms" },
+            { value: `${(99.9 + (i % 5) * 0.01).toFixed(2)}%`, label: "Uptime", change: "Nominal" }
+          ]
+        });
+      } else {
+        const rows = [];
+        for (let r = 1; r <= 25; r++) {
+          rows.push([`Node ${r}`, `Shard ${i}-${r}`, `${(r * 1.5).toFixed(1)} GB`, "Synced"]);
+        }
+        stressSpec.slides.push({
+          type: "table",
+          title: `Data Partition Ledger ${i}`,
+          headers: ["Node", "Shard ID", "Allocated RAM", "Sync State"],
+          rows: rows
+        });
+      }
+    }
+
+    const stressJson = path.join(tempDir, 'stress_spec.json');
+    const stressPptx = path.join(tempDir, 'stress_out.pptx');
+    fs.writeFileSync(stressJson, JSON.stringify(stressSpec));
+
+    execSync(`node "${quickGenScript}" "${stressJson}" "${stressPptx}"`, {
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+
+    const info = await validatePptxFile(stressPptx, 50);
+
+    if (fs.existsSync(pptxEngineerValidate)) {
+      const pyCmd = `python3 "${pptxEngineerValidate}" "${stressPptx}"`;
+      const output = execSync(pyCmd, { encoding: 'utf-8' });
+      if (!output.includes('PASSED')) {
+        throw new Error(`Structural validator failed on stress deck: ${output}`);
+      }
+    }
+
+    return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} total generated slides verified`;
+  });
+
   // Cleanup temporary directory
   try {
     fs.rmSync(tempDir, { recursive: true, force: true });

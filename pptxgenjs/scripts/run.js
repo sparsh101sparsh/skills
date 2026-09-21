@@ -59,6 +59,11 @@ const child = spawn(process.execPath, [targetScript, ...scriptArgs], {
   }
 });
 
+child.on('error', (err) => {
+  console.error(`Execution error: ${err.message}`);
+  process.exit(1);
+});
+
 child.on('exit', (code, signal) => {
   if (signal) {
     process.kill(process.pid, signal);

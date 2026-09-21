@@ -10,7 +10,26 @@
 
 const fs = require('fs');
 const path = require('path');
-const pptxgen = require('pptxgenjs');
+
+let pptxgen;
+try {
+  pptxgen = require('pptxgenjs');
+} catch (e) {
+  const os = require('os');
+  const candidates = [
+    path.resolve(__dirname, '..', 'node_modules', 'pptxgenjs'),
+    path.resolve(os.homedir(), '.gemini/config/skills/pptxgenjs/node_modules/pptxgenjs')
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      pptxgen = require(c);
+      break;
+    }
+  }
+  if (!pptxgen) {
+    throw e;
+  }
+}
 
 async function main() {
   const args = process.argv.slice(2);
@@ -151,6 +170,10 @@ JSON schema sample:
   };
 
   for (const item of slides) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
     const slide = pptx.addSlide();
     slide.background = { color: theme.light };
 
@@ -169,8 +192,8 @@ JSON schema sample:
           bold: true,
           valign: 'middle'
         });
-        if (item.subtitle) {
-          slide.addText(item.subtitle, {
+        if (item.subtitle != null && item.subtitle !== '') {
+          slide.addText(String(item.subtitle), {
             x: 1.0,
             y: 3.4,
             w: 8.0,
@@ -182,30 +205,33 @@ JSON schema sample:
           });
         }
         if (item.author || item.date) {
-          const footer = [item.author, item.date].filter(Boolean).join(' • ');
-          slide.addText(footer, {
-            x: 1.0,
-            y: 4.6,
-            w: 8.0,
-            h: 0.5,
-            fontFace: theme.font,
-            fontSize: 12,
-            color: 'CBD5E1'
-          });
+          const footer = [item.author, item.date].filter(Boolean).map(String).join(' • ');
+          if (footer) {
+            slide.addText(footer, {
+              x: 1.0,
+              y: 4.6,
+              w: 8.0,
+              h: 0.5,
+              fontFace: theme.font,
+              fontSize: 12,
+              color: 'CBD5E1'
+            });
+          }
         }
         break;
       }
 
       case 'cards': {
         addHeader(slide, item.title, item.subtitle, theme);
-        const cards = item.cards || [];
+        const rawCards = Array.isArray(item.cards) ? item.cards : [];
+        const cards = rawCards.filter(c => c != null);
         const count = cards.length;
         const totalW = 8.6;
         const startX = 0.7;
         const cardY = 1.8;
         const cardH = 3.2;
-        const gap = 0.25;
-        const cardW = count > 0 ? (totalW - gap * (count - 1)) / count : 0;
+        const gap = count > 1 ? Math.min(0.25, (totalW * 0.4) / (count - 1)) : 0;
+        const cardW = count > 0 ? Math.max(0.2, (totalW - gap * (count - 1)) / count) : 0;
 
         cards.forEach((card, idx) => {
           const curX = startX + idx * (cardW + gap);
@@ -229,7 +255,8 @@ JSON schema sample:
             line: { color: idx % 2 === 0 ? theme.primary : theme.secondary }
           });
           // Card Title
-          slide.addText(String(card.title != null ? card.title : (typeof card === 'string' ? card : '')), {
+          const cardTitle = typeof card === 'object' ? (card.title != null ? String(card.title) : '') : String(card);
+          slide.addText(cardTitle, {
             x: curX + 0.2,
             y: cardY + 0.3,
             w: Math.max(0.1, cardW - 0.4),
@@ -241,11 +268,12 @@ JSON schema sample:
             valign: 'top'
           });
           // Card Body
-          slide.addText(String(card.text != null ? card.text : ''), {
+          const cardBody = typeof card === 'object' && card.text != null ? String(card.text) : '';
+          slide.addText(cardBody, {
             x: curX + 0.2,
             y: cardY + 0.9,
             w: Math.max(0.1, cardW - 0.4),
-            h: cardH - 1.1,
+            h: Math.max(0.2, cardH - 1.1),
             fontFace: theme.font,
             fontSize: 12,
             color: theme.muted,
@@ -258,14 +286,15 @@ JSON schema sample:
 
       case 'stats': {
         addHeader(slide, item.title, item.subtitle, theme);
-        const stats = item.stats || [];
+        const rawStats = Array.isArray(item.stats) ? item.stats : [];
+        const stats = rawStats.filter(s => s != null);
         const count = stats.length;
         const totalW = 8.6;
         const startX = 0.7;
         const boxY = 1.8;
         const boxH = 3.0;
-        const gap = 0.3;
-        const boxW = count > 0 ? (totalW - gap * (count - 1)) / count : 0;
+        const gap = count > 1 ? Math.min(0.3, (totalW * 0.4) / (count - 1)) : 0;
+        const boxW = count > 0 ? Math.max(0.2, (totalW - gap * (count - 1)) / count) : 0;
 
         stats.forEach((stat, idx) => {
           const curX = startX + idx * (boxW + gap);
@@ -280,7 +309,8 @@ JSON schema sample:
           });
 
           // Stat Value
-          slide.addText(String(stat.value != null ? stat.value : ''), {
+          const statVal = typeof stat === 'object' ? (stat.value != null ? String(stat.value) : '') : String(stat);
+          slide.addText(statVal, {
             x: curX + 0.2,
             y: boxY + 0.4,
             w: Math.max(0.1, boxW - 0.4),
@@ -294,7 +324,8 @@ JSON schema sample:
           });
 
           // Stat Label
-          slide.addText(String(stat.label != null ? stat.label : ''), {
+          const statLabel = typeof stat === 'object' && stat.label != null ? String(stat.label) : '';
+          slide.addText(statLabel, {
             x: curX + 0.2,
             y: boxY + 1.4,
             w: Math.max(0.1, boxW - 0.4),
@@ -308,7 +339,7 @@ JSON schema sample:
           });
 
           // Trend / Note
-          if (stat.change) {
+          if (typeof stat === 'object' && stat.change != null && stat.change !== '') {
             slide.addText(String(stat.change), {
               x: curX + 0.2,
               y: boxY + 2.1,
@@ -328,52 +359,71 @@ JSON schema sample:
       case 'table': {
         addHeader(slide, item.title, item.subtitle, theme);
         let tableRows = [];
-        if (item.headers && item.rows) {
-          const headerRow = (Array.isArray(item.headers) ? item.headers : [item.headers]).map(h => ({
-            text: String(h),
-            options: { fill: { color: theme.primary }, color: theme.white, bold: true }
-          }));
-          const dataRows = (Array.isArray(item.rows) ? item.rows : []).map(r => {
-            const cells = Array.isArray(r) ? r : [r];
-            return cells.map(c => ({
-              text: String(c),
-              options: { fill: { color: theme.white }, color: theme.dark }
-            }));
-          });
-          tableRows = [headerRow, ...dataRows];
+        if (item.headers || item.rows) {
+          if (item.headers) {
+            const rawHeaders = Array.isArray(item.headers) ? item.headers : [item.headers];
+            const headerRow = rawHeaders.map(h => {
+              if (typeof h === 'object' && h !== null && h.text !== undefined) return h;
+              return {
+                text: h != null ? String(h) : '',
+                options: { fill: { color: theme.primary }, color: theme.white, bold: true }
+              };
+            });
+            tableRows.push(headerRow);
+          }
+          if (item.rows) {
+            const rawRows = Array.isArray(item.rows) ? item.rows : [item.rows];
+            for (const r of rawRows) {
+              if (r == null) continue;
+              const cells = Array.isArray(r) ? r : [r];
+              const rowCells = cells.map(c => {
+                if (typeof c === 'object' && c !== null && c.text !== undefined) return c;
+                return {
+                  text: c != null ? String(c) : '',
+                  options: { fill: { color: theme.white }, color: theme.dark }
+                };
+              });
+              tableRows.push(rowCells);
+            }
+          }
         } else if (item.table && Array.isArray(item.table)) {
-          tableRows = item.table.map((row, rIdx) => {
+          tableRows = item.table.filter(r => r != null).map((row, rIdx) => {
             if (Array.isArray(row)) {
               return row.map(cell => {
                 if (typeof cell === 'object' && cell !== null && cell.text !== undefined) return cell;
                 return {
-                  text: String(cell),
+                  text: cell != null ? String(cell) : '',
                   options: rIdx === 0
                     ? { fill: { color: theme.primary }, color: theme.white, bold: true }
                     : { fill: { color: theme.white }, color: theme.dark }
                 };
               });
             }
-            return [{ text: String(row) }];
+            return [{ text: row != null ? String(row) : '' }];
           });
         }
 
-        if (tableRows.length > 0) {
-          const numCols = Math.max(...tableRows.map(r => Array.isArray(r) ? r.length : 1));
-          const colWidth = numCols > 0 ? 8.6 / numCols : 8.6;
-          const colW = Array(numCols).fill(colWidth);
+        // Filter out empty rows if any
+        tableRows = tableRows.filter(r => Array.isArray(r) && r.length > 0);
 
-          slide.addTable(tableRows, {
-            x: 0.7,
-            y: 1.6,
-            w: 8.6,
-            colW,
-            rowH: 0.45,
-            autoPage: true,
-            fontSize: 11,
-            fontFace: theme.font,
-            border: { type: 'solid', pt: 0.5, color: 'CBD5E1' }
-          });
+        if (tableRows.length > 0) {
+          const numCols = Math.max(...tableRows.map(r => r.length));
+          if (numCols > 0) {
+            const colWidth = 8.6 / numCols;
+            const colW = Array(numCols).fill(colWidth);
+
+            slide.addTable(tableRows, {
+              x: 0.7,
+              y: 1.6,
+              w: 8.6,
+              colW,
+              rowH: 0.45,
+              autoPage: true,
+              fontSize: 11,
+              fontFace: theme.font,
+              border: { type: 'solid', pt: 0.5, color: 'CBD5E1' }
+            });
+          }
         }
         break;
       }
@@ -381,14 +431,14 @@ JSON schema sample:
       case 'chart': {
         addHeader(slide, item.title, item.subtitle, theme);
         const chartData = item.data || (item.chart && item.chart.data) || [];
-        const rawType = (item.chartType || (item.chart && item.chart.type) || 'col').toLowerCase();
+        const rawType = String(item.chartType || (item.chart && item.chart.type) || 'col').toLowerCase();
         let chartType = pptx.charts.BAR;
         let barDir = 'col';
 
         if (rawType === 'bar') {
           chartType = pptx.charts.BAR;
           barDir = 'bar';
-        } else if (rawType === 'col') {
+        } else if (rawType === 'col' || rawType === 'column') {
           chartType = pptx.charts.BAR;
           barDir = 'col';
         } else if (rawType === 'line') {
@@ -405,7 +455,7 @@ JSON schema sample:
           chartType = pptx.charts.SCATTER;
         }
 
-        if (chartData.length > 0) {
+        if (Array.isArray(chartData) && chartData.length > 0) {
           const chartColors = item.colors || [theme.primary, theme.secondary, 'F59E0B', 'EF4444'];
           const chartOpts = {
             x: 0.7,
@@ -435,12 +485,15 @@ JSON schema sample:
       case 'bullets':
       default: {
         addHeader(slide, item.title, item.subtitle, theme);
-        const bullets = item.bullets || item.content || [];
-        const formattedBullets = bullets.map(b => {
-          if (typeof b === 'string') {
-            return { text: b, options: { bullet: true, fontSize: 15, color: theme.dark, breakLine: true, fontFace: theme.font } };
+        const rawBullets = Array.isArray(item.bullets) ? item.bullets : (Array.isArray(item.content) ? item.content : []);
+        const formattedBullets = rawBullets.filter(b => b != null).map(b => {
+          if (typeof b === 'string' || typeof b === 'number' || typeof b === 'boolean') {
+            return { text: String(b), options: { bullet: true, fontSize: 15, color: theme.dark, breakLine: true, fontFace: theme.font } };
           }
-          return { text: b.text, options: { bullet: true, fontSize: b.fontSize || 15, color: b.color || theme.dark, breakLine: true, fontFace: theme.font } };
+          if (typeof b === 'object') {
+            return { text: b.text != null ? String(b.text) : '', options: { bullet: true, fontSize: b.fontSize || 15, color: b.color || theme.dark, breakLine: true, fontFace: theme.font } };
+          }
+          return { text: String(b), options: { bullet: true, fontSize: 15, color: theme.dark, breakLine: true, fontFace: theme.font } };
         });
 
         // Content box
@@ -454,14 +507,16 @@ JSON schema sample:
           rectRadius: 0.1
         });
 
-        slide.addText(formattedBullets, {
-          x: 1.0,
-          y: 1.8,
-          w: 8.0,
-          h: 3.0,
-          valign: 'top',
-          paraSpaceAfter: 10
-        });
+        if (formattedBullets.length > 0) {
+          slide.addText(formattedBullets, {
+            x: 1.0,
+            y: 1.8,
+            w: 8.0,
+            h: 3.0,
+            valign: 'top',
+            paraSpaceAfter: 10
+          });
+        }
         break;
       }
     }
