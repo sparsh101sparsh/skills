@@ -108,8 +108,11 @@ def run_validation(unpacked_dir, orig_unpacked_dir=None):
                         mode = rel.get("TargetMode", "Internal")
                         rid = rel.get("Id", "")
                         if mode == "Internal" and not target.startswith("http://") and not target.startswith("https://"):
-                            # Resolve target relative to the part directory
-                            target_norm = os.path.normpath(os.path.join(rel_base_dir, target))
+                            # Resolve target relative to package root if leading slash, else part directory
+                            if target.startswith("/"):
+                                target_norm = os.path.normpath(os.path.join(unpacked_dir, target.lstrip("/")))
+                            else:
+                                target_norm = os.path.normpath(os.path.join(rel_base_dir, target))
                             if not os.path.exists(target_norm):
                                 errors.append(f"Dangling relationship '{rid}' in '{os.path.relpath(rels_file, unpacked_dir)}': target '{target}' does not exist.")
                             else:
