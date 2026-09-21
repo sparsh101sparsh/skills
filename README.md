@@ -36,6 +36,7 @@ This repository houses verified, production-hardened skills for:
 | [`pptx-engineer`](./pptx-engineer/) | `v1.0.0` | **Document Engineering** | Precision PowerPoint (.pptx) OOXML engineering, presentation design, and structural validation. | ✅ Production |
 | [`pptxgenjs`](./pptxgenjs/) | `v1.0.0` | **Document Generation** | Programmatic PowerPoint (.pptx) deck generation, JSON-to-deck compilation, KPI dashboards, and chart creation via PptxGenJS. | ✅ Production |
 | [`forensic-doc-verifier`](./forensic-doc-verifier/) | `v1.0.0` | **Security & Forensics** | ICAO Doc 9303 MRZ parsing (7-3-1 check digits), passport validation, and visual Error Level Analysis (ELA). | ✅ Production |
+| [`api-security-auditor`](./api-security-auditor/) | `v1.0.0` | **Security & Penetration Testing** | Automated OWASP API Top 10 scanner for SQL injection, path traversal, and auth boundary probes. | ✅ Production |
 
 ---
 
