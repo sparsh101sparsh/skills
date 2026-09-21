@@ -184,7 +184,7 @@ node pptxgenjs/scripts/run.js pptxgenjs/examples/pitch_deck.js output_pitch.pptx
 # 2. Generate executive KPI dashboard
 node pptxgenjs/scripts/run.js pptxgenjs/examples/metrics_dashboard.js output_dashboard.pptx
 
-# 3. Compile JSON presentation specification directly into PowerPoint
+# 3. Compile JSON presentation specification directly into PowerPoint (supports title, cards, stats, table, chart, bullets)
 node pptxgenjs/scripts/quick_gen.js presentation_spec.json output.pptx
 
 # 4. Stream JSON from stdin

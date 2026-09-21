@@ -29,9 +29,18 @@ node scripts/run.js my_presentation.js [output.pptx]
 # Or when installed in Antigravity global config:
 node ~/.gemini/config/skills/pptxgenjs/scripts/run.js my_presentation.js [output.pptx]
 
-# Or generate directly from a JSON definition:
+# Or generate directly from a JSON definition (file or stdin pipe):
 node pptxgenjs/scripts/quick_gen.js slides.json output.pptx
+cat slides.json | node pptxgenjs/scripts/quick_gen.js - output.pptx
 ```
+
+### Declarative Slide Types Supported by `quick_gen.js`
+- **`title`**: Hero slide with `title`, `subtitle`, `author`, `date`
+- **`cards`**: Multi-column container cards with `title`, `text`
+- **`stats`**: Key performance indicators with `value`, `label`, `change`
+- **`table`**: Formatted tables via `headers` & `rows` or 2D `table` array
+- **`chart`**: Native Office charts (`col`, `bar`, `line`, `pie`, `doughnut`, `area`) via `chartType` and `data`
+- **`bullets`**: Clean takeaway lists via `bullets` or `content` strings
 
 ---
 

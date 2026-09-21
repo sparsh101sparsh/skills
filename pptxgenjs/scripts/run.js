@@ -9,15 +9,29 @@
  */
 
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 
 const args = process.argv.slice(2);
-if (args.length === 0) {
-  console.error('Usage: node run.js <script.js> [args...]');
-  process.exit(1);
+if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+  console.log(`Universal PptxGenJS Script Runner
+Usage:
+  node run.js <script.js> [args...]
+
+Description:
+  Executes a PowerPoint generation script with the skill's node_modules
+  injected into NODE_PATH, enabling require('pptxgenjs') from any directory.
+
+Options:
+  --help, -h   Show this help message`);
+  process.exit(args.length === 0 ? 1 : 0);
 }
 
 const targetScript = path.resolve(process.cwd(), args[0]);
+if (!fs.existsSync(targetScript)) {
+  console.error(`Error: Script not found: ${targetScript}`);
+  process.exit(1);
+}
 const scriptArgs = args.slice(1);
 
 const skillNodeModules = path.resolve(__dirname, '..', 'node_modules');
@@ -39,3 +53,4 @@ child.on('exit', (code, signal) => {
     process.exit(code || 0);
   }
 });
+

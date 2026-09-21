@@ -187,10 +187,10 @@ async function main() {
     return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slide`;
   });
 
-  // Test 4: CLI Tool: quick_gen.js from JSON input
-  await runTest('CLI Generator: quick_gen.js (JSON Spec -> Deck)', async () => {
+  // Test 4: CLI Tool: quick_gen.js from JSON input (5 slides: title, cards, stats, table, chart)
+  await runTest('CLI Generator: quick_gen.js (All 5 Slide Types -> Deck)', async () => {
     const jsonSpec = {
-      title: "Automated Test Deck",
+      title: "Automated Comprehensive Test Deck",
       theme: { primary: "2563EB", secondary: "10B981", dark: "0F172A", light: "F8FAFC" },
       slides: [
         {
@@ -216,6 +216,27 @@ async function main() {
             { value: "100%", label: "Test Coverage", change: "+0% YoY" },
             { value: "0", label: "Known Regressions", change: "Stable" }
           ]
+        },
+        {
+          type: "table",
+          title: "Service Reliability Ledger",
+          subtitle: "Production availability by microservice",
+          headers: ["Service", "Uptime", "P99 Latency", "Error Rate"],
+          rows: [
+            ["Auth Gateway", "99.99%", "18ms", "0.001%"],
+            ["Data Engine", "99.95%", "42ms", "0.004%"],
+            ["Storage Mesh", "100.0%", "12ms", "0.000%"]
+          ]
+        },
+        {
+          type: "chart",
+          title: "Throughput Progression",
+          subtitle: "RPS volume over recent build cycles",
+          chartType: "col",
+          chartTitle: "Build Throughput (K RPS)",
+          data: [
+            { name: "Production", labels: ["Build 1", "Build 2", "Build 3", "Build 4"], values: [14.2, 18.5, 24.0, 31.8] }
+          ]
         }
       ]
     };
@@ -231,11 +252,85 @@ async function main() {
       env: { ...process.env, NODE_PATH: skillNodeModules }
     });
 
-    const info = await validatePptxFile(outPath, 3);
+    const info = await validatePptxFile(outPath, 5);
     return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides`;
   });
 
-  // Test 5: Universal Runner: scripts/run.js
+  // Test 5: CLI Tool: quick_gen.js via Stdin Pipe
+  await runTest('CLI Generator: quick_gen.js via Stdin Pipe (-)', async () => {
+    const jsonPath = path.join(tempDir, 'sample_spec.json');
+    const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
+    const outPath = path.join(tempDir, 'stdin_gen_out.pptx');
+
+    execSync(`cat "${jsonPath}" | node "${quickGenScript}" - "${outPath}"`, {
+      cwd: skillRoot,
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+
+    const info = await validatePptxFile(outPath, 5);
+    return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides`;
+  });
+
+  // Test 6: CLI Help Flags & Error Path Validation
+  await runTest('CLI Flag & Error Boundary Handling (--help, missing files)', async () => {
+    const runScript = path.join(skillRoot, 'scripts', 'run.js');
+    const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
+
+    // 1. run.js --help should exit 0
+    execSync(`node "${runScript}" --help`);
+
+    // 2. quick_gen.js --help should exit 0
+    execSync(`node "${quickGenScript}" --help`);
+
+    // 3. run.js with missing file should exit 1
+    let runFailed = false;
+    try {
+      execSync(`node "${runScript}" non_existent_script_123.js`, { stdio: 'pipe' });
+    } catch {
+      runFailed = true;
+    }
+    if (!runFailed) throw new Error('Expected run.js to exit non-zero for missing script');
+
+    // 4. quick_gen.js with missing file should exit 1
+    let quickGenFailed = false;
+    try {
+      execSync(`node "${quickGenScript}" non_existent_spec_123.json`, { stdio: 'pipe' });
+    } catch {
+      quickGenFailed = true;
+    }
+    if (!quickGenFailed) throw new Error('Expected quick_gen.js to exit non-zero for missing spec');
+
+    return 'All CLI edge cases handled cleanly';
+  });
+
+  // Test 7: OPC Package Validator Negative Rejection Tests
+  await runTest('OPC Package Validator Rejection Integrity (corrupt / empty files)', async () => {
+    // 1. Empty file (0 bytes)
+    const emptyFile = path.join(tempDir, 'empty.pptx');
+    fs.writeFileSync(emptyFile, Buffer.alloc(0));
+    let emptyCaught = false;
+    try {
+      await validatePptxFile(emptyFile);
+    } catch (e) {
+      emptyCaught = e.message.includes('0 bytes');
+    }
+    if (!emptyCaught) throw new Error('Validator failed to reject 0-byte file');
+
+    // 2. Corrupted header bytes
+    const corruptFile = path.join(tempDir, 'corrupt.pptx');
+    fs.writeFileSync(corruptFile, Buffer.from('NOT A ZIP ARCHIVE AT ALL'));
+    let corruptCaught = false;
+    try {
+      await validatePptxFile(corruptFile);
+    } catch (e) {
+      corruptCaught = e.message.includes('ZIP magic bytes');
+    }
+    if (!corruptCaught) throw new Error('Validator failed to reject corrupted magic bytes');
+
+    return 'Rejected 0-byte and invalid archives as expected';
+  });
+
+  // Test 8: Universal Runner: scripts/run.js
   await runTest('Universal Runner: scripts/run.js execution wrapper', async () => {
     const runnerScript = path.join(skillRoot, 'scripts', 'run.js');
     const pitchDeckScript = path.join(skillRoot, 'examples', 'pitch_deck.js');
@@ -249,17 +344,27 @@ async function main() {
     return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides`;
   });
 
-  // Test 6: Cross-Validation with pptx-engineer structural validator (if python3 available)
+  // Test 9: Cross-Validation with pptx-engineer structural validator (if python3 available)
   const pptxEngineerValidate = path.resolve(skillRoot, '..', 'pptx-engineer', 'scripts', 'validate.py');
   if (fs.existsSync(pptxEngineerValidate)) {
     await runTest('Cross-Tool Structural Validation (pptx-engineer validate.py)', async () => {
-      const outPath = path.join(tempDir, 'dashboard_out.pptx');
-      const pyCmd = `python3 "${pptxEngineerValidate}" "${outPath}"`;
-      const output = execSync(pyCmd, { encoding: 'utf-8' });
-      if (!output.includes('PASSED')) {
-        throw new Error(`Structural validator failed: ${output}`);
+      // Validate both dashboard and comprehensive quick_gen deck
+      const dashboardPath = path.join(tempDir, 'dashboard_out.pptx');
+      const quickGenPath = path.join(tempDir, 'quick_gen_out.pptx');
+
+      const pyCmd1 = `python3 "${pptxEngineerValidate}" "${dashboardPath}"`;
+      const output1 = execSync(pyCmd1, { encoding: 'utf-8' });
+      if (!output1.includes('PASSED')) {
+        throw new Error(`Structural validator failed for dashboard: ${output1}`);
       }
-      return 'OOXML schema & rels validated';
+
+      const pyCmd2 = `python3 "${pptxEngineerValidate}" "${quickGenPath}"`;
+      const output2 = execSync(pyCmd2, { encoding: 'utf-8' });
+      if (!output2.includes('PASSED')) {
+        throw new Error(`Structural validator failed for quick_gen deck: ${output2}`);
+      }
+
+      return 'OOXML schema & rels validated across decks';
     });
   }
 

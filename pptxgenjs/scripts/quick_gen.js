@@ -14,11 +14,23 @@ const pptxgen = require('pptxgenjs');
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.length === 0) {
+  if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     console.log(`
 Quick PPTX Generator
 Usage:
   node quick_gen.js <input.json> [output.pptx]
+  cat <input.json> | node quick_gen.js - [output.pptx]
+
+Options:
+  --help, -h   Show this help message
+
+Slide types supported:
+  - "title": Hero slide with title, subtitle, author, date
+  - "cards": Responsive card columns (title, text)
+  - "stats": Key metric callouts (value, label, change)
+  - "table": Modern tables with headers and rows
+  - "chart": Column, bar, line, doughnut, pie, or area charts
+  - "bullets": Structured takeaway bullet points
 
 JSON schema sample:
 {
@@ -48,11 +60,29 @@ JSON schema sample:
         { "value": "118%", "label": "Net Dollar Retention", "change": "+6% vs Target" },
         { "value": "99.98%", "label": "Platform Uptime SLA", "change": "Zero Sev-1 Incidents" }
       ]
+    },
+    {
+      "type": "table",
+      "title": "Financial Breakdown",
+      "headers": ["Quarter", "Revenue", "Target", "Margin"],
+      "rows": [
+        ["Q1", "$4.2M", "$4.0M", "76%"],
+        ["Q2", "$5.1M", "$4.8M", "78%"],
+        ["Q3", "$6.4M", "$5.9M", "81%"]
+      ]
+    },
+    {
+      "type": "chart",
+      "title": "Quarterly Revenue Growth",
+      "chartType": "col",
+      "data": [
+        { "name": "Actual", "labels": ["Q1", "Q2", "Q3", "Q4"], "values": [4.2, 5.1, 6.4, 7.8] }
+      ]
     }
   ]
 }
 `);
-    process.exit(0);
+    process.exit(args.length === 0 ? 1 : 0);
   }
 
   const inputFile = args[0];
@@ -62,7 +92,12 @@ JSON schema sample:
   if (inputFile === '-') {
     rawData = fs.readFileSync(0, 'utf-8');
   } else {
-    rawData = fs.readFileSync(path.resolve(process.cwd(), inputFile), 'utf-8');
+    const absInput = path.resolve(process.cwd(), inputFile);
+    if (!fs.existsSync(absInput)) {
+      console.error(`Error: Input file not found: ${absInput}`);
+      process.exit(1);
+    }
+    rawData = fs.readFileSync(absInput, 'utf-8');
     if (!outputFile) {
       outputFile = inputFile.replace(/\.json$/i, '') + '.pptx';
     }
@@ -144,7 +179,7 @@ JSON schema sample:
         const cardY = 1.8;
         const cardH = 3.2;
         const gap = 0.25;
-        const cardW = (totalW - gap * (count - 1)) / count;
+        const cardW = count > 0 ? (totalW - gap * (count - 1)) / count : 0;
 
         cards.forEach((card, idx) => {
           const curX = startX + idx * (cardW + gap);
@@ -171,7 +206,7 @@ JSON schema sample:
           slide.addText(card.title, {
             x: curX + 0.2,
             y: cardY + 0.3,
-            w: cardW - 0.4,
+            w: Math.max(0.1, cardW - 0.4),
             h: 0.6,
             fontFace: theme.font,
             fontSize: 16,
@@ -183,7 +218,7 @@ JSON schema sample:
           slide.addText(card.text, {
             x: curX + 0.2,
             y: cardY + 0.9,
-            w: cardW - 0.4,
+            w: Math.max(0.1, cardW - 0.4),
             h: cardH - 1.1,
             fontFace: theme.font,
             fontSize: 12,
@@ -204,7 +239,7 @@ JSON schema sample:
         const boxY = 1.8;
         const boxH = 3.0;
         const gap = 0.3;
-        const boxW = (totalW - gap * (count - 1)) / count;
+        const boxW = count > 0 ? (totalW - gap * (count - 1)) / count : 0;
 
         stats.forEach((stat, idx) => {
           const curX = startX + idx * (boxW + gap);
@@ -222,7 +257,7 @@ JSON schema sample:
           slide.addText(stat.value, {
             x: curX + 0.2,
             y: boxY + 0.4,
-            w: boxW - 0.4,
+            w: Math.max(0.1, boxW - 0.4),
             h: 1.0,
             fontFace: theme.font,
             fontSize: 34,
@@ -236,7 +271,7 @@ JSON schema sample:
           slide.addText(stat.label, {
             x: curX + 0.2,
             y: boxY + 1.4,
-            w: boxW - 0.4,
+            w: Math.max(0.1, boxW - 0.4),
             h: 0.6,
             fontFace: theme.font,
             fontSize: 13,
@@ -251,7 +286,7 @@ JSON schema sample:
             slide.addText(stat.change, {
               x: curX + 0.2,
               y: boxY + 2.1,
-              w: boxW - 0.4,
+              w: Math.max(0.1, boxW - 0.4),
               h: 0.5,
               fontFace: theme.font,
               fontSize: 11,
@@ -261,6 +296,91 @@ JSON schema sample:
             });
           }
         });
+        break;
+      }
+
+      case 'table': {
+        addHeader(slide, item.title, item.subtitle, theme);
+        let tableRows = [];
+        if (item.headers && item.rows) {
+          const headerRow = item.headers.map(h => ({
+            text: String(h),
+            options: { fill: { color: theme.primary }, color: theme.white, bold: true }
+          }));
+          const dataRows = item.rows.map(r => r.map(c => ({
+            text: String(c),
+            options: { fill: { color: theme.white }, color: theme.dark }
+          })));
+          tableRows = [headerRow, ...dataRows];
+        } else if (item.table && Array.isArray(item.table)) {
+          tableRows = item.table.map((row, rIdx) => {
+            if (Array.isArray(row)) {
+              return row.map(cell => {
+                if (typeof cell === 'object' && cell !== null && cell.text !== undefined) return cell;
+                return {
+                  text: String(cell),
+                  options: rIdx === 0
+                    ? { fill: { color: theme.primary }, color: theme.white, bold: true }
+                    : { fill: { color: theme.white }, color: theme.dark }
+                };
+              });
+            }
+            return [{ text: String(row) }];
+          });
+        }
+
+        if (tableRows.length > 0) {
+          const numCols = Math.max(...tableRows.map(r => r.length));
+          const colWidth = numCols > 0 ? 8.6 / numCols : 8.6;
+          const colW = Array(numCols).fill(colWidth);
+
+          slide.addTable(tableRows, {
+            x: 0.7,
+            y: 1.6,
+            w: 8.6,
+            colW,
+            rowH: 0.45,
+            fontSize: 11,
+            fontFace: theme.font,
+            border: { type: 'solid', pt: 0.5, color: 'CBD5E1' }
+          });
+        }
+        break;
+      }
+
+      case 'chart': {
+        addHeader(slide, item.title, item.subtitle, theme);
+        const chartData = item.data || (item.chart && item.chart.data) || [];
+        const rawType = (item.chartType || (item.chart && item.chart.type) || 'col').toLowerCase();
+        let chartType = pptx.charts.COL;
+        if (rawType === 'bar') chartType = pptx.charts.BAR;
+        else if (rawType === 'line') chartType = pptx.charts.LINE;
+        else if (rawType === 'pie') chartType = pptx.charts.PIE;
+        else if (rawType === 'doughnut') chartType = pptx.charts.DOUGHNUT;
+        else if (rawType === 'area') chartType = pptx.charts.AREA;
+
+        if (chartData.length > 0) {
+          const chartColors = item.colors || [theme.primary, theme.secondary, 'F59E0B', 'EF4444'];
+          const chartOpts = {
+            x: 0.7,
+            y: 1.6,
+            w: 8.6,
+            h: 3.4,
+            chartColors,
+            showTitle: Boolean(item.chartTitle),
+            title: item.chartTitle || '',
+            titleFontSize: 12,
+            titleColor: theme.dark,
+            showLegend: item.showLegend !== false,
+            legendPos: item.legendPos || 'b',
+            valGridLine: { color: 'E2E8F0', style: 'dash' }
+          };
+          if (chartType === pptx.charts.DOUGHNUT) {
+            chartOpts.holeSize = item.holeSize || 60;
+            chartOpts.showPercent = true;
+          }
+          slide.addChart(chartType, chartData, chartOpts);
+        }
         break;
       }
 
