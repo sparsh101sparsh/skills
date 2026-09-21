@@ -21,8 +21,9 @@ Usage:
   node quick_gen.js <input.json> [output.pptx]
   cat <input.json> | node quick_gen.js - [output.pptx]
 
-Options:
-  --help, -h   Show this help message
+    Options:
+      --help, -h      Show this help message
+      --version, -v   Show version number
 
 Slide types supported:
   - "title": Hero slide with title, subtitle, author, date
@@ -85,6 +86,12 @@ JSON schema sample:
     process.exit(args.length === 0 ? 1 : 0);
   }
 
+  if (args[0] === '--version' || args[0] === '-v') {
+    const pkg = require('../package.json');
+    console.log(`quick_gen v${pkg.version}`);
+    process.exit(0);
+  }
+
   const inputFile = args[0];
   let outputFile = args[1];
 
@@ -107,24 +114,43 @@ JSON schema sample:
     outputFile = 'presentation.pptx';
   }
 
-  const spec = JSON.parse(rawData);
+  let spec;
+  try {
+    spec = JSON.parse(rawData);
+  } catch (parseErr) {
+    console.error(`Error: Malformed JSON in specification: ${parseErr.message}`);
+    process.exit(1);
+  }
+
+  if (!spec || typeof spec !== 'object') {
+    console.error('Error: Invalid JSON specification. Root must be an object or array.');
+    process.exit(1);
+  }
+
+  const slides = Array.isArray(spec) ? spec : (spec.slides || []);
+  if (slides.length === 0) {
+    console.error('Error: Presentation specification must contain at least one slide.');
+    process.exit(1);
+  }
+
+  const meta = Array.isArray(spec) ? {} : spec;
   const pptx = new pptxgen();
 
-  pptx.layout = spec.layout || 'LAYOUT_16x9';
-  pptx.author = spec.author || 'PptxGenJS Generator';
-  pptx.title = spec.title || 'Presentation';
+  pptx.layout = meta.layout || 'LAYOUT_16x9';
+  pptx.author = meta.author || 'PptxGenJS Generator';
+  pptx.title = meta.title || 'Presentation';
 
   const theme = {
-    primary: (spec.theme && spec.theme.primary) || '1E3A8A',
-    secondary: (spec.theme && spec.theme.secondary) || '0D9488',
-    dark: (spec.theme && spec.theme.dark) || '0F172A',
-    light: (spec.theme && spec.theme.light) || 'F8FAFC',
-    muted: (spec.theme && spec.theme.muted) || '64748B',
+    primary: (meta.theme && meta.theme.primary) || '1E3A8A',
+    secondary: (meta.theme && meta.theme.secondary) || '0D9488',
+    dark: (meta.theme && meta.theme.dark) || '0F172A',
+    light: (meta.theme && meta.theme.light) || 'F8FAFC',
+    muted: (meta.theme && meta.theme.muted) || '64748B',
     white: 'FFFFFF',
-    font: (spec.theme && spec.theme.font) || 'Segoe UI'
+    font: (meta.theme && meta.theme.font) || 'Segoe UI'
   };
 
-  for (const item of (spec.slides || [])) {
+  for (const item of slides) {
     const slide = pptx.addSlide();
     slide.background = { color: theme.light };
 
@@ -132,7 +158,7 @@ JSON schema sample:
       case 'title': {
         // Full bleed accent bar or background
         slide.background = { color: theme.primary };
-        slide.addText(item.title || spec.title, {
+        slide.addText(String(item.title || meta.title || 'Presentation'), {
           x: 1.0,
           y: 2.0,
           w: 8.0,
@@ -203,7 +229,7 @@ JSON schema sample:
             line: { color: idx % 2 === 0 ? theme.primary : theme.secondary }
           });
           // Card Title
-          slide.addText(card.title, {
+          slide.addText(String(card.title != null ? card.title : (typeof card === 'string' ? card : '')), {
             x: curX + 0.2,
             y: cardY + 0.3,
             w: Math.max(0.1, cardW - 0.4),
@@ -215,7 +241,7 @@ JSON schema sample:
             valign: 'top'
           });
           // Card Body
-          slide.addText(card.text, {
+          slide.addText(String(card.text != null ? card.text : ''), {
             x: curX + 0.2,
             y: cardY + 0.9,
             w: Math.max(0.1, cardW - 0.4),
@@ -254,7 +280,7 @@ JSON schema sample:
           });
 
           // Stat Value
-          slide.addText(stat.value, {
+          slide.addText(String(stat.value != null ? stat.value : ''), {
             x: curX + 0.2,
             y: boxY + 0.4,
             w: Math.max(0.1, boxW - 0.4),
@@ -268,7 +294,7 @@ JSON schema sample:
           });
 
           // Stat Label
-          slide.addText(stat.label, {
+          slide.addText(String(stat.label != null ? stat.label : ''), {
             x: curX + 0.2,
             y: boxY + 1.4,
             w: Math.max(0.1, boxW - 0.4),
@@ -283,7 +309,7 @@ JSON schema sample:
 
           // Trend / Note
           if (stat.change) {
-            slide.addText(stat.change, {
+            slide.addText(String(stat.change), {
               x: curX + 0.2,
               y: boxY + 2.1,
               w: Math.max(0.1, boxW - 0.4),
@@ -303,14 +329,17 @@ JSON schema sample:
         addHeader(slide, item.title, item.subtitle, theme);
         let tableRows = [];
         if (item.headers && item.rows) {
-          const headerRow = item.headers.map(h => ({
+          const headerRow = (Array.isArray(item.headers) ? item.headers : [item.headers]).map(h => ({
             text: String(h),
             options: { fill: { color: theme.primary }, color: theme.white, bold: true }
           }));
-          const dataRows = item.rows.map(r => r.map(c => ({
-            text: String(c),
-            options: { fill: { color: theme.white }, color: theme.dark }
-          })));
+          const dataRows = (Array.isArray(item.rows) ? item.rows : []).map(r => {
+            const cells = Array.isArray(r) ? r : [r];
+            return cells.map(c => ({
+              text: String(c),
+              options: { fill: { color: theme.white }, color: theme.dark }
+            }));
+          });
           tableRows = [headerRow, ...dataRows];
         } else if (item.table && Array.isArray(item.table)) {
           tableRows = item.table.map((row, rIdx) => {
@@ -330,7 +359,7 @@ JSON schema sample:
         }
 
         if (tableRows.length > 0) {
-          const numCols = Math.max(...tableRows.map(r => r.length));
+          const numCols = Math.max(...tableRows.map(r => Array.isArray(r) ? r.length : 1));
           const colWidth = numCols > 0 ? 8.6 / numCols : 8.6;
           const colW = Array(numCols).fill(colWidth);
 
@@ -340,6 +369,7 @@ JSON schema sample:
             w: 8.6,
             colW,
             rowH: 0.45,
+            autoPage: true,
             fontSize: 11,
             fontFace: theme.font,
             border: { type: 'solid', pt: 0.5, color: 'CBD5E1' }
@@ -352,12 +382,28 @@ JSON schema sample:
         addHeader(slide, item.title, item.subtitle, theme);
         const chartData = item.data || (item.chart && item.chart.data) || [];
         const rawType = (item.chartType || (item.chart && item.chart.type) || 'col').toLowerCase();
-        let chartType = pptx.charts.COL;
-        if (rawType === 'bar') chartType = pptx.charts.BAR;
-        else if (rawType === 'line') chartType = pptx.charts.LINE;
-        else if (rawType === 'pie') chartType = pptx.charts.PIE;
-        else if (rawType === 'doughnut') chartType = pptx.charts.DOUGHNUT;
-        else if (rawType === 'area') chartType = pptx.charts.AREA;
+        let chartType = pptx.charts.BAR;
+        let barDir = 'col';
+
+        if (rawType === 'bar') {
+          chartType = pptx.charts.BAR;
+          barDir = 'bar';
+        } else if (rawType === 'col') {
+          chartType = pptx.charts.BAR;
+          barDir = 'col';
+        } else if (rawType === 'line') {
+          chartType = pptx.charts.LINE;
+        } else if (rawType === 'pie') {
+          chartType = pptx.charts.PIE;
+        } else if (rawType === 'doughnut') {
+          chartType = pptx.charts.DOUGHNUT;
+        } else if (rawType === 'area') {
+          chartType = pptx.charts.AREA;
+        } else if (rawType === 'radar') {
+          chartType = pptx.charts.RADAR;
+        } else if (rawType === 'scatter') {
+          chartType = pptx.charts.SCATTER;
+        }
 
         if (chartData.length > 0) {
           const chartColors = item.colors || [theme.primary, theme.secondary, 'F59E0B', 'EF4444'];
@@ -375,7 +421,9 @@ JSON schema sample:
             legendPos: item.legendPos || 'b',
             valGridLine: { color: 'E2E8F0', style: 'dash' }
           };
-          if (chartType === pptx.charts.DOUGHNUT) {
+          if (chartType === pptx.charts.BAR) {
+            chartOpts.barDir = barDir;
+          } else if (chartType === pptx.charts.DOUGHNUT) {
             chartOpts.holeSize = item.holeSize || 60;
             chartOpts.showPercent = true;
           }

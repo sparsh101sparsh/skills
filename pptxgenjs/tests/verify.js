@@ -79,6 +79,15 @@ async function validatePptxFile(filePath, expectedMinSlides = 1) {
     throw new Error(`Expected at least ${expectedMinSlides} slide(s), found ${slideParts.length} in ${filePath}`);
   }
 
+  // Validate DrawingML chart XML integrity for any generated charts
+  const chartParts = files.filter(f => /^ppt\/charts\/chart\d+\.xml$/.test(f));
+  for (const cp of chartParts) {
+    const chartXml = await zip.file(cp).async('text');
+    if (!/<c:[a-zA-Z0-9]+Chart>/.test(chartXml)) {
+      throw new Error(`Chart part '${cp}' is missing a valid DrawingML chart element (<c:...Chart>) in ${filePath}`);
+    }
+  }
+
   // Check [Content_Types].xml content
   const ctContent = await zip.file('[Content_Types].xml').async('text');
   if (!ctContent.includes('presentationml') && !ctContent.includes('ContentType')) {
@@ -88,6 +97,7 @@ async function validatePptxFile(filePath, expectedMinSlides = 1) {
   return {
     size: stat.size,
     slides: slideParts.length,
+    charts: chartParts.length,
     parts: files.length
   };
 }
@@ -145,10 +155,11 @@ async function main() {
       border: { type: 'solid', pt: 0.5, color: 'E2E8F0' }
     });
 
-    slide1.addChart(pptx.charts.COL, [
+    slide1.addChart(pptx.charts.BAR, [
       { name: 'Velocity', labels: ['W1', 'W2', 'W3'], values: [12, 19, 27] }
     ], {
       x: 5.2, y: 1.2, w: 4.0, h: 3.5,
+      barDir: 'col',
       chartColors: ['2563EB']
     });
 
@@ -271,16 +282,53 @@ async function main() {
     return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides`;
   });
 
-  // Test 6: CLI Help Flags & Error Path Validation
-  await runTest('CLI Flag & Error Boundary Handling (--help, missing files)', async () => {
+  // Test 6: CLI Tool: quick_gen.js from Root-Level Array JSON Specification
+  await runTest('CLI Generator: quick_gen.js Root Array Format -> Deck', async () => {
+    const arraySpec = [
+      {
+        type: "title",
+        title: "Platform Engineering Architecture",
+        subtitle: "Enterprise Microservices Roadmap"
+      },
+      {
+        type: "cards",
+        title: "Architectural Tenets",
+        cards: [
+          { title: "Stateless Execution", text: "Zero local persistence across worker nodes." },
+          { title: "Idempotent Ops", text: "Safe automated replays without side effects." }
+        ]
+      }
+    ];
+
+    const arrayJsonPath = path.join(tempDir, 'array_spec.json');
+    fs.writeFileSync(arrayJsonPath, JSON.stringify(arraySpec, null, 2));
+
+    const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
+    const outPath = path.join(tempDir, 'array_spec_out.pptx');
+
+    execSync(`node "${quickGenScript}" "${arrayJsonPath}" "${outPath}"`, {
+      cwd: skillRoot,
+      env: { ...process.env, NODE_PATH: skillNodeModules }
+    });
+
+    const info = await validatePptxFile(outPath, 2);
+    return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides`;
+  });
+
+  // Test 7: CLI Flags & Error Boundary Handling
+  await runTest('CLI Flag & Error Boundary Handling (--help, --version, missing/invalid specs)', async () => {
     const runScript = path.join(skillRoot, 'scripts', 'run.js');
     const quickGenScript = path.join(skillRoot, 'scripts', 'quick_gen.js');
 
-    // 1. run.js --help should exit 0
+    // 1. run.js --help & -v
     execSync(`node "${runScript}" --help`);
+    execSync(`node "${runScript}" -v`);
+    execSync(`node "${runScript}" --version`);
 
-    // 2. quick_gen.js --help should exit 0
+    // 2. quick_gen.js --help & -v
     execSync(`node "${quickGenScript}" --help`);
+    execSync(`node "${quickGenScript}" -v`);
+    execSync(`node "${quickGenScript}" --version`);
 
     // 3. run.js with missing file should exit 1
     let runFailed = false;
@@ -292,19 +340,41 @@ async function main() {
     if (!runFailed) throw new Error('Expected run.js to exit non-zero for missing script');
 
     // 4. quick_gen.js with missing file should exit 1
-    let quickGenFailed = false;
+    let quickGenMissingFailed = false;
     try {
       execSync(`node "${quickGenScript}" non_existent_spec_123.json`, { stdio: 'pipe' });
     } catch {
-      quickGenFailed = true;
+      quickGenMissingFailed = true;
     }
-    if (!quickGenFailed) throw new Error('Expected quick_gen.js to exit non-zero for missing spec');
+    if (!quickGenMissingFailed) throw new Error('Expected quick_gen.js to exit non-zero for missing spec');
+
+    // 5. quick_gen.js with malformed JSON should exit 1
+    const malformedJson = path.join(tempDir, 'malformed.json');
+    fs.writeFileSync(malformedJson, '{ not valid json: true, ');
+    let quickGenMalformedFailed = false;
+    try {
+      execSync(`node "${quickGenScript}" "${malformedJson}" "${path.join(tempDir, 'malformed.pptx')}"`, { stdio: 'pipe' });
+    } catch {
+      quickGenMalformedFailed = true;
+    }
+    if (!quickGenMalformedFailed) throw new Error('Expected quick_gen.js to exit non-zero for malformed JSON');
+
+    // 6. quick_gen.js with empty slides array should exit 1
+    const emptySlidesJson = path.join(tempDir, 'empty_slides.json');
+    fs.writeFileSync(emptySlidesJson, JSON.stringify({ slides: [] }));
+    let quickGenEmptyFailed = false;
+    try {
+      execSync(`node "${quickGenScript}" "${emptySlidesJson}" "${path.join(tempDir, 'empty_slides.pptx')}"`, { stdio: 'pipe' });
+    } catch {
+      quickGenEmptyFailed = true;
+    }
+    if (!quickGenEmptyFailed) throw new Error('Expected quick_gen.js to exit non-zero for empty slides');
 
     return 'All CLI edge cases handled cleanly';
   });
 
-  // Test 7: OPC Package Validator Negative Rejection Tests
-  await runTest('OPC Package Validator Rejection Integrity (corrupt / empty files)', async () => {
+  // Test 8: OPC Package Validator Negative Rejection Tests
+  await runTest('OPC Package Validator Rejection Integrity (corrupt / empty / invalid chart files)', async () => {
     // 1. Empty file (0 bytes)
     const emptyFile = path.join(tempDir, 'empty.pptx');
     fs.writeFileSync(emptyFile, Buffer.alloc(0));
@@ -327,10 +397,28 @@ async function main() {
     }
     if (!corruptCaught) throw new Error('Validator failed to reject corrupted magic bytes');
 
-    return 'Rejected 0-byte and invalid archives as expected';
+    // 3. Corrupt chart XML part (missing <c:...Chart> DrawingML tag)
+    const quickGenOut = path.join(tempDir, 'quick_gen_out.pptx');
+    if (fs.existsSync(quickGenOut)) {
+      const validZip = await JSZip.loadAsync(fs.readFileSync(quickGenOut));
+      validZip.file('ppt/charts/chart1.xml', '<?xml version="1.0"?><c:chartSpace><c:plotArea><c:catAx/></c:plotArea></c:chartSpace>');
+      const corruptChartBuf = await validZip.generateAsync({ type: 'nodebuffer' });
+      const corruptChartFile = path.join(tempDir, 'corrupt_chart.pptx');
+      fs.writeFileSync(corruptChartFile, corruptChartBuf);
+
+      let chartCaught = false;
+      try {
+        await validatePptxFile(corruptChartFile);
+      } catch (e) {
+        chartCaught = e.message.includes('missing a valid DrawingML chart element');
+      }
+      if (!chartCaught) throw new Error('Validator failed to reject chart part with missing DrawingML chart tag');
+    }
+
+    return 'Rejected 0-byte, invalid archives, and malformed DrawingML charts';
   });
 
-  // Test 8: Universal Runner: scripts/run.js
+  // Test 9: Universal Runner: scripts/run.js
   await runTest('Universal Runner: scripts/run.js execution wrapper', async () => {
     const runnerScript = path.join(skillRoot, 'scripts', 'run.js');
     const pitchDeckScript = path.join(skillRoot, 'examples', 'pitch_deck.js');
@@ -344,7 +432,7 @@ async function main() {
     return `${(info.size / 1024).toFixed(1)} KB, ${info.slides} slides`;
   });
 
-  // Test 9: Cross-Validation with pptx-engineer structural validator (if python3 available)
+  // Test 10: Cross-Validation with pptx-engineer structural validator (if python3 available)
   const pptxEngineerValidate = path.resolve(skillRoot, '..', 'pptx-engineer', 'scripts', 'validate.py');
   if (fs.existsSync(pptxEngineerValidate)) {
     await runTest('Cross-Tool Structural Validation (pptx-engineer validate.py)', async () => {

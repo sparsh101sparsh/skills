@@ -5,8 +5,7 @@
 PptxGenJS supports standard Office charting via `slide.addChart(type, data, options)`.
 
 ### Chart Types (`pptx.charts.*`):
-- `pptx.charts.BAR` (horizontal bar)
-- `pptx.charts.COL` (vertical column)
+- `pptx.charts.BAR` (vertical column with `barDir: 'col'` [default], or horizontal bar with `barDir: 'bar'`)
 - `pptx.charts.LINE` (line chart)
 - `pptx.charts.PIE` (pie chart)
 - `pptx.charts.DOUGHNUT` (doughnut chart)
@@ -39,11 +38,12 @@ const chartData = [
 
 #### Multi-Series Column Chart
 ```javascript
-slide.addChart(pptx.charts.COL, chartData, {
+slide.addChart(pptx.charts.BAR, chartData, {
   x: 0.8,
   y: 1.8,
   w: 5.0,
   h: 3.2,
+  barDir: 'col', // 'col' for vertical column chart, 'bar' for horizontal bar chart
   chartColors: ['1E3A8A', '0D9488'],
   showTitle: true,
   title: 'Revenue by Region ($M)',

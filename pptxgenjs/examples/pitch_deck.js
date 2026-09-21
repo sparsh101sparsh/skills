@@ -351,11 +351,12 @@ async function createPitchDeck(outputPath = 'modern_pitch_deck.pptx') {
       }
     ];
 
-    slide.addChart(pptx.charts.COL, chartData, {
+    slide.addChart(pptx.charts.BAR, chartData, {
       x: 0.8,
       y: 1.5,
       w: 4.6,
       h: 3.5,
+      barDir: 'col',
       chartColors: [C.brandBlue],
       showLegend: false,
       showTitle: true,

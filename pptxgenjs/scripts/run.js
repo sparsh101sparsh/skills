@@ -23,8 +23,15 @@ Description:
   injected into NODE_PATH, enabling require('pptxgenjs') from any directory.
 
 Options:
-  --help, -h   Show this help message`);
+  --help, -h      Show this help message
+  --version, -v   Show version number`);
   process.exit(args.length === 0 ? 1 : 0);
+}
+
+if (args[0] === '--version' || args[0] === '-v') {
+  const pkg = require('../package.json');
+  console.log(`agy-skill-pptxgenjs v${pkg.version}`);
+  process.exit(0);
 }
 
 const targetScript = path.resolve(process.cwd(), args[0]);
@@ -34,9 +41,15 @@ if (!fs.existsSync(targetScript)) {
 }
 const scriptArgs = args.slice(1);
 
+const os = require('os');
 const skillNodeModules = path.resolve(__dirname, '..', 'node_modules');
+const globalNodeModules = path.resolve(os.homedir(), '.gemini/config/skills/pptxgenjs/node_modules');
+const validNodePaths = [skillNodeModules];
+if (fs.existsSync(globalNodeModules) && !validNodePaths.includes(globalNodeModules)) {
+  validNodePaths.push(globalNodeModules);
+}
 const existingNodePath = process.env.NODE_PATH ? process.env.NODE_PATH.split(path.delimiter) : [];
-const updatedNodePath = [skillNodeModules, ...existingNodePath].join(path.delimiter);
+const updatedNodePath = [...validNodePaths, ...existingNodePath].join(path.delimiter);
 
 const child = spawn(process.execPath, [targetScript, ...scriptArgs], {
   stdio: 'inherit',

@@ -170,10 +170,11 @@ slide.addTable(rows, {
 
 ### 5.4 Charts (Column, Bar, Doughnut, Line)
 ```javascript
-slide.addChart(pptx.charts.COL, [
+slide.addChart(pptx.charts.BAR, [
   { name: 'Revenue', labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [3.2, 4.5, 5.8, 7.4] }
 ], {
   x: 0.8, y: 1.5, w: 5.0, h: 3.4,
+  barDir: 'col', // 'col' for vertical column chart, 'bar' for horizontal bar chart
   chartColors: ['2563EB'],
   showTitle: true, title: 'Quarterly Revenue ($M)',
   valGridLine: { color: 'E2E8F0', style: 'dash' }

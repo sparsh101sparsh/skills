@@ -126,7 +126,7 @@ async function createDashboardDeck(outputPath = 'executive_dashboard.pptx') {
     });
 
     // Left Chart: Revenue Trend (Column Chart)
-    slide.addChart(pptx.charts.COL, [
+    slide.addChart(pptx.charts.BAR, [
       {
         name: 'Actual Revenue',
         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
@@ -137,6 +137,7 @@ async function createDashboardDeck(outputPath = 'executive_dashboard.pptx') {
       y: 2.7,
       w: 4.8,
       h: 2.3,
+      barDir: 'col',
       chartColors: [C.primary],
       showTitle: true,
       title: 'Monthly Revenue Progression ($M)',
