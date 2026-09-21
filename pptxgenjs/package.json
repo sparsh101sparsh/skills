@@ -1,0 +1,24 @@
+{
+  "name": "agy-skill-pptxgenjs",
+  "version": "1.0.0",
+  "description": "Antigravity skill for programmatic PowerPoint presentation generation using PptxGenJS",
+  "type": "commonjs",
+  "main": "scripts/run.js",
+  "scripts": {
+    "test": "node tests/verify.js"
+  },
+  "keywords": [
+    "antigravity",
+    "skill",
+    "powerpoint",
+    "pptx",
+    "pptxgenjs",
+    "presentation",
+    "automation"
+  ],
+  "author": "Sparsh",
+  "license": "MIT",
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}
