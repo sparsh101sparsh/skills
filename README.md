@@ -35,6 +35,7 @@ This repository houses verified, production-hardened skills for:
 |---|---|---|---|---|
 | [`pptx-engineer`](./pptx-engineer/) | `v1.0.0` | **Document Engineering** | Precision PowerPoint (.pptx) OOXML engineering, presentation design, and structural validation. | ✅ Production |
 | [`pptxgenjs`](./pptxgenjs/) | `v1.0.0` | **Document Generation** | Programmatic PowerPoint (.pptx) deck generation, JSON-to-deck compilation, KPI dashboards, and chart creation via PptxGenJS. | ✅ Production |
+| [`forensic-doc-verifier`](./forensic-doc-verifier/) | `v1.0.0` | **Security & Forensics** | ICAO Doc 9303 MRZ parsing (7-3-1 check digits), passport validation, and visual Error Level Analysis (ELA). | ✅ Production |
 
 ---
 
@@ -191,13 +192,31 @@ node pptxgenjs/scripts/quick_gen.js presentation_spec.json output.pptx
 cat presentation_spec.json | node pptxgenjs/scripts/quick_gen.js - output.pptx
 ```
 
+### forensic-doc-verifier (Document Forensics & MRZ Validation)
+
+```bash
+# 1. Parse and validate ICAO 9303 MRZ strings (TD1, TD2, TD3) with 7-3-1 check digits
+python3 forensic-doc-verifier/scripts/mrz_parser.py mrz_input.txt
+
+# 2. Run Error Level Analysis (ELA) for image tamper / splice detection
+python3 forensic-doc-verifier/scripts/ela_analyzer.py passport_scan.jpg -o ela_heatmap.jpg
+
+# 3. Unified document forensics audit report
+python3 forensic-doc-verifier/scripts/verify_document.py --mrz mrz_input.txt --image passport_scan.jpg
+```
+
 ---
 
 ## 📋 Verification & Testing
 
 Every script and workflow in this repository undergoes automated end-to-end testing:
 
-### 1. `pptxgenjs` Automated Test Suite
+### 1. `forensic-doc-verifier` Unit & Cryptographic Test Suite
+```bash
+pytest forensic-doc-verifier/tests/test_forensics.py
+```
+
+### 2. `pptxgenjs` Automated Test Suite
 Runs programmatic generation across all layouts, examples, and JSON compilation, verifying OPC container integrity, slide counts, and byte non-emptiness:
 
 ```bash
