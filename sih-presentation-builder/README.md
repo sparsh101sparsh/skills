@@ -1,95 +1,72 @@
-# Smart India Hackathon Presentation Builder (`sih-presentation-builder`)
+# sih-presentation-builder
 
-[![Agent Skill](https://img.shields.io/badge/Agent%20Skill-agentskills.io-blue.svg)](https://agentskills.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+an agent skill for building diagram-first, research-backed presentation decks for the smart india hackathon (sih) and technical competitions.
 
-A specialized Agent Skill engineered for AI coding assistants to build research-backed, diagram-first, competition-winning presentations for the **Smart India Hackathon (SIH)**, national engineering hackathons, and high-stakes technical defense evaluations.
+## what is this
 
----
+most ai slide generators produce unreadable decks: walls of bullet points, generic rounded cards that look like a saas landing page, and random decorative graphics like floating leaves or futuristic glass tablets. 
 
-## 🎯 Why This Skill Exists
+in a hackathon like sih, evaluators scan hundreds of pdfs silently in about two minutes. if they have to read long paragraphs or decipher generic buzzwords, they move on.
 
-Most AI-generated presentation slides collapse under competition jury scrutiny for predictable reasons:
-1. **Wall of Text:** Slides are filled with narrative paragraphs and repetitive bullet points that no judge has time to read.
-2. **"AI Slop" Clutter:** Slides are cluttered with decorative leaves, tree watermarks, floating geometric bubbles, and meaningless graphics.
-3. **The Card Matrix Trap:** Every slide looks like a web dashboard with 4 to 6 identical rounded rectangles.
-4. **Unverifiable Claims:** Claims of "99.9% accuracy" or "instant cloud sync" without specifying datasets, test conditions, or offline fallbacks.
-5. **Domain-Blind Buzzwords:** Misplacing fintech buzzwords (e.g., "KYC") into border security, agriculture, or mining problem statements.
+we built this skill after tearing down 50 winning sih decks (including team lumora, storm surge, and coalworks) and rebuilding real competition slides. it turns vague problem statements into structured, diagram-first visual arguments that judges can understand in seconds.
 
-`sih-presentation-builder` encodes the accumulated lessons, design rules, and visual grammar reverse-engineered from **50 official SIH winning presentations** (including *Team Lumora*, *Storm Surge*, *Udaan*, *CoalWorks*, and *EcoPick*), combined with extensive live iteration on real SIH problem statements.
+## why most ai decks get rejected
 
----
+when an llm generates presentation slides without strict guardrails, it almost always makes the same mistakes:
+* text walls: dumping full paragraphs copied straight from the problem description.
+* decorative ai clutter: adding floating leaves, tree silhouettes, and geometric shapes that mean nothing.
+* the card trap: putting 4 to 6 identical rounded boxes on every slide.
+* fake numbers: claiming 99.9% accuracy or sub-second speeds without naming a dataset or hardware benchmark.
+* domain-blind buzzwords: using corporate fintech terms like "kyc" on a border security or rural agriculture deck.
+* no offline path: assuming 24/7 high-speed cloud internet for problems set in remote villages, coal mines, or border outposts.
 
-## 📐 Core Architecture & Visual Rules
+## the rules that actually win
 
-* **The 80/20 Rule:** 80% diagrammatic visuals, 20% high-impact telegraphic copy.
-* **Telegraphic Copy:** Maximum 6 to 8 words per bullet point. Numbers beat adjectives.
-* **Dominant Diagram:** Every slide centers around one defensible visual engine (a hub-and-spoke cluster, a numbered pipeline, a paired challenge-mitigation matrix, or a horizontal stakeholder process ribbon).
-* **The Non-Negotiable Offline Fallback:** Every technical architecture slide must feature an explicit, labeled fallback route for zero-internet environments.
-* **Human-in-the-Loop Realism:** Replace impossible claims of 100% autonomous AI with explainable decision-support copilots featuring an Amber review tier for human judgment.
+1. 80% diagrams, 20% text. every slide centers around one dominant visual (a hub-and-spoke cluster, a numbered pipeline, a comparison matrix, or a user journey ribbon).
+2. bullets stay under 8 words. if an idea needs 3 lines of prose, it belongs in a diagram, not a bullet.
+3. numbers beat adjectives. write "ghostfacenet-v2 (512-d) inference in 35ms on edge cpu" instead of "ultra-fast cutting-edge deep learning model".
+4. keep humans in the loop. judges know automated ai makes mistakes under dust, glare, and real-world wear. always include an explainable review tier where human personnel make the final call.
+5. show the offline fallback. if the internet cuts out, show exactly how the local device queues data and syncs later.
+6. stick to three colors. deep navy for structure, blue for active steps, and light slate for background. use green, amber, and red strictly for status.
 
----
+## the official 6-slide structure
 
-## 📂 Repository Structure
+* slide 1: administrative details. clean grid with problem id, title, theme, category, and team info. zero marketing slogans.
+* slide 2: problem and solution. left side has a central problem hub with radial failure spokes; right side has colored capability badges that directly solve each spoke.
+* slide 3: technical architecture. a numbered 6-station pipeline with labeled data payloads and a clear dotted line showing the offline fallback route.
+* slide 4: feasibility and viability. top half compares cost, time, and error rates against existing methods; bottom half pairs real field risks with technical mitigations.
+* slide 5: impact and benefits. a 4-step stakeholder journey (frontline user to ministry) paired with quantified math against official government baseline numbers.
+* slide 6: research and proof. a tam/sam/som market sizing bullseye, a 3-tier matrix of government and ieee citations, and clickable proof-of-work badges for github, video, and demo.
 
-```
-sih-presentation-builder/
-├── SKILL.md                              # Core operational instructions for AI agents
-├── README.md                             # User guide, installation, and overview
-└── references/
-    ├── lessons-from-iteration.md         # Detailed retrospective of live prompt iterations & mistakes
-    ├── slide-quality-checklist.md        # Comprehensive multi-dimensional evaluation rubric
-    └── visual-decision-framework.md      # Content-to-visual decision tree and geometry rules
-```
+## quick start
 
----
-
-## 🚀 Installation & Usage
-
-### 1. Install via GitHub CLI (`gh skill`)
-You can install this skill directly using GitHub CLI's preview skill manager:
-
+### install with github cli
 ```bash
 gh skill install sparsh101sparsh/skills sih-presentation-builder
 ```
 
-### 2. Manual Installation
-Clone this repository into your agent's skill directory:
-
+### manual install
+copy the skill folder into your agent directory:
 ```bash
-# For Google Antigravity / Gemini CLI
+# for antigravity
 cp -r sih-presentation-builder ~/.gemini/config/skills/
 
-# For Claude / Cursor / Codex
+# for claude / cursor
 cp -r sih-presentation-builder ~/.claude/skills/
 ```
 
----
+## what is inside
 
-## 📋 The 6-Slide Master Architecture
-
-| Slide | Mandatory Title | Dominant Visual Anchor | Key Defense Element |
-| :--- | :--- | :--- | :--- |
-| **Slide 1** | Administrative & Jury Identity | High-contrast 2x2 or 3x2 bordered card grid | Instant registration verification in under 3 seconds |
-| **Slide 2** | Problem & Proposed Solution | Dual-Cluster: Problem hub (left) + Solution badges (right) | 1-to-1 mapping between systemic pain and technical capability |
-| **Slide 3** | Technical Approach & Architecture | Numbered 6-Station Pipeline with trust boundaries | Explicit offline/no-internet fallback branch + labeled payloads |
-| **Slide 4** | Feasibility and Viability | Top Benchmark Table + Bottom Challenge-Mitigation Matrix | Field constraints paired directly with engineered mitigations |
-| **Slide 5** | Impacts and Benefits | 4-Step Stakeholder Journey Ribbon | Quantified Indian baseline math + annual savings in ₹ Crore |
-| **Slide 6** | Research, References & Proof | TAM/SAM/SOM Bullseye + 3-Tier Sourced Citation Matrix | High-contrast action badges for GitHub repo & 60s demo video |
-
----
-
-## 🔍 Validation & Testing
-
-Validate this skill against the Agent Skills specification using GitHub CLI:
-
-```bash
-gh skill publish --dry-run
+```
+sih-presentation-builder/
+├── SKILL.md                          # core instructions for the ai agent
+├── README.md                         # this overview
+└── references/
+    ├── lessons-from-iteration.md     # full breakdown of real prompts, mistakes, and fixes
+    ├── slide-quality-checklist.md    # evaluation matrix and 11 red-team judge questions
+    └── visual-decision-framework.md  # guide for choosing diagrams, layouts, and connectors
 ```
 
----
+## license
 
-## 📜 Author & License
-
-* **Author:** Sparsh ([@sparsh101sparsh](https://github.com/sparsh101sparsh))
-* **License:** Licensed under the [MIT License](https://opensource.org/licenses/MIT).
+mit
