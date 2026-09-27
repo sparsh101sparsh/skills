@@ -37,6 +37,7 @@ This repository houses verified, production-hardened skills for:
 | [`pptxgenjs`](./pptxgenjs/) | `v1.0.0` | **Document Generation** | Programmatic PowerPoint (.pptx) deck generation, JSON-to-deck compilation, KPI dashboards, and chart creation via PptxGenJS. | ✅ Production |
 | [`forensic-doc-verifier`](./forensic-doc-verifier/) | `v1.0.0` | **Security & Forensics** | ICAO Doc 9303 MRZ parsing (7-3-1 check digits), passport validation, and visual Error Level Analysis (ELA). | ✅ Production |
 | [`api-security-auditor`](./api-security-auditor/) | `v1.0.0` | **Security & Penetration Testing** | Automated OWASP API Top 10 scanner for SQL injection, path traversal, and auth boundary probes. | ✅ Production |
+| [`sih-presentation-builder`](./sih-presentation-builder/) | `v1.0.0` | **Hackathons & Competitions** | Diagram-first Smart India Hackathon presentation engineering, 6-slide system, visual decision trees, and jury defense strategy. | ✅ Production |
 
 ---
 
@@ -121,6 +122,34 @@ pptxgenjs/
 2. **Card-Based Layouts**: Groups information into rounded rectangle containers (`pptx.shapes.ROUNDED_RECTANGLE`) with subtle borders (`E2E8F0`) instead of cluttered bullet lists.
 3. **Color Discipline & Typography**: Strict 3-color palette (deep navy/slate backgrounds, primary brand blue `2563EB`, accent green/amber) with clean cross-platform sans-serif typography (`Segoe UI`, `Calibri`).
 4. **Data Visualizations**: Native Office chart engine integration for bar, column, line, and doughnut charts with styled value labels and muted gridlines.
+
+---
+
+## 🏆 Featured Skill: `sih-presentation-builder`
+
+**Build research-backed, visually strong Smart India Hackathon presentations using a structured workflow for problem analysis, narrative design, evidence, diagrams, technical communication, SIH compliance, and iterative visual review.**
+
+Reverse-engineered from **50 official SIH winning presentations** (including *Team Lumora*, *Storm Surge*, *Udaan*, *CoalWorks*, and *EcoPick*), this skill encodes the design rules, diagrammatic grammar, and jury-defense strategies needed to win top honors at national engineering competitions.
+
+### 🏛️ Package Architecture
+
+```
+sih-presentation-builder/
+├── SKILL.md                          # Master instruction file with YAML frontmatter
+├── README.md                         # Skill documentation and installation guide
+└── references/
+    ├── lessons-from-iteration.md     # Detailed retrospective of prompt interactions, failures, & rules
+    ├── slide-quality-checklist.md    # Multi-dimensional evaluation rubric & 11 red-team judge questions
+    └── visual-decision-framework.md  # Content-to-visual decision tree and layout geometry standards
+```
+
+### ⚙️ Core Engineering Principles
+
+1. **The 80/20 Visual Rule**: 80% diagrammatic visuals, 20% high-impact telegraphic copy (max 6 to 8 words per bullet). Numbers beat adjectives.
+2. **Dominant Visual Anchors**: Every slide centers around one defensible diagram (dual-cluster hub, numbered 6-station pipeline, challenge-mitigation matrix, stakeholder journey ribbon, or TAM bullseye).
+3. **Mandatory Offline Branch**: Technical architecture explicitly models edge execution under zero-connectivity constraints.
+4. **Human-in-the-Loop Realism**: Replaces impossible claims of 100% automated AI with explainable decision-support copilots featuring an Amber review tier for human judgment.
+5. **Zero "AI Slop"**: Actively eliminates decorative leaves, tree watermarks, floating geometric bubbles, and meaningless clipart.
 
 ---
 
