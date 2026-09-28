@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="./assets/icon.svg" width="128" height="128" alt="hackathon-presentation-builder icon" />
+</p>
+
 # hackathon-presentation-builder
 
-an agent skill for building diagram-first, research-backed presentation decks for the smart india hackathon (sih) and technical competitions.
+an agent skill for building diagram-first, research-backed presentation decks for hackathons and technical competitions.
 
 ## what is this
 
