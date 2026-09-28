@@ -1,4 +1,4 @@
-# sih-presentation-builder
+# hackathon-presentation-builder
 
 an agent skill for building diagram-first, research-backed presentation decks for the smart india hackathon (sih) and technical competitions.
 
@@ -42,23 +42,23 @@ when an llm generates presentation slides without strict guardrails, it almost a
 
 ### install with github cli
 ```bash
-gh skill install sparsh101sparsh/skills sih-presentation-builder
+gh skill install sparsh101sparsh/skills hackathon-presentation-builder
 ```
 
 ### manual install
 copy the skill folder into your agent directory:
 ```bash
 # for antigravity
-cp -r sih-presentation-builder ~/.gemini/config/skills/
+cp -r hackathon-presentation-builder ~/.gemini/config/skills/
 
 # for claude / cursor
-cp -r sih-presentation-builder ~/.claude/skills/
+cp -r hackathon-presentation-builder ~/.claude/skills/
 ```
 
 ## what is inside
 
 ```
-sih-presentation-builder/
+hackathon-presentation-builder/
 ├── SKILL.md                          # core instructions for the ai agent
 ├── README.md                         # this overview
 └── references/

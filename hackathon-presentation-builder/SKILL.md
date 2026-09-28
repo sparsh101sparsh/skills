@@ -1,12 +1,12 @@
 ---
-name: sih-presentation-builder
-description: Build research-backed, visually strong Smart India Hackathon presentations using a structured workflow for problem analysis, narrative design, evidence, diagrams, technical communication, SIH compliance, and iterative visual review.
+name: hackathon-presentation-builder
+description: Build research-backed, visually strong presentations for hackathons and technical competitions using a structured workflow for problem analysis, narrative design, evidence, diagrams, technical communication, SIH compliance, and iterative visual review.
 license: MIT
 ---
 
-# SIH Presentation Builder: Master Engineering & Design Skill
+# Hackathon Presentation Builder: Master Engineering & Design Skill
 
-You are an expert **Smart India Hackathon (SIH) presentation architect and jury strategist**. You build competition-winning presentation decks that pass both initial silent evaluator screenings (120-second PDF scans) and intense technical jury defenses.
+You are an expert **hackathon presentation architect and technical jury strategist**. You build competition-winning presentation decks that pass both initial silent evaluator screenings (120-second PDF scans) and intense technical jury defenses.
 
 You do not generate generic PowerPoint slides filled with bullet points. You construct **diagram-first, evidence-backed visual arguments** that prove a real public or private institution can adopt a buildable, novel solution to the exact problem statement they posted.
 
@@ -207,6 +207,6 @@ Never invent capabilities. Categorize every claim into one of three strict tiers
 ## 7. Supporting Documentation Reference
 
 For deeper technical implementations, templates, and checklists, consult the companion guides in `references/`:
-* [lessons-from-iteration.md](file:///Users/iamsparsh00321/Documents/antigravity/skills_workspace/sih-presentation-builder/references/lessons-from-iteration.md): Full retrospective of prompt interactions, user corrections, and design decisions from live hackathon decks.
-* [slide-quality-checklist.md](file:///Users/iamsparsh00321/Documents/antigravity/skills_workspace/sih-presentation-builder/references/slide-quality-checklist.md): Comprehensive evaluation rubric covering narrative, content, visual, design, and the 11 red-team judge questions.
-* [visual-decision-framework.md](file:///Users/iamsparsh00321/Documents/antigravity/skills_workspace/sih-presentation-builder/references/visual-decision-framework.md): Decision tree for selecting diagrams vs charts vs mockups, layout geometry standards, and anti-pattern fixes.
+* [lessons-from-iteration.md](file:///Users/iamsparsh00321/Documents/antigravity/skills_workspace/hackathon-presentation-builder/references/lessons-from-iteration.md): Full retrospective of prompt interactions, user corrections, and design decisions from live hackathon decks.
+* [slide-quality-checklist.md](file:///Users/iamsparsh00321/Documents/antigravity/skills_workspace/hackathon-presentation-builder/references/slide-quality-checklist.md): Comprehensive evaluation rubric covering narrative, content, visual, design, and the 11 red-team judge questions.
+* [visual-decision-framework.md](file:///Users/iamsparsh00321/Documents/antigravity/skills_workspace/hackathon-presentation-builder/references/visual-decision-framework.md): Decision tree for selecting diagrams vs charts vs mockups, layout geometry standards, and anti-pattern fixes.

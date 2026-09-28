@@ -37,7 +37,7 @@ This repository houses verified, production-hardened skills for:
 | [`pptxgenjs`](./pptxgenjs/) | `v1.0.0` | **Document Generation** | Programmatic PowerPoint (.pptx) deck generation, JSON-to-deck compilation, KPI dashboards, and chart creation via PptxGenJS. | ✅ Production |
 | [`forensic-doc-verifier`](./forensic-doc-verifier/) | `v1.0.0` | **Security & Forensics** | ICAO Doc 9303 MRZ parsing (7-3-1 check digits), passport validation, and visual Error Level Analysis (ELA). | ✅ Production |
 | [`api-security-auditor`](./api-security-auditor/) | `v1.0.0` | **Security & Penetration Testing** | Automated OWASP API Top 10 scanner for SQL injection, path traversal, and auth boundary probes. | ✅ Production |
-| [`sih-presentation-builder`](./sih-presentation-builder/) | `v1.0.0` | **Hackathons & Competitions** | Diagram-first Smart India Hackathon presentation engineering, 6-slide system, visual decision trees, and jury defense strategy. | ✅ Production |
+| [`hackathon-presentation-builder`](./hackathon-presentation-builder/) | `v1.0.0` | **Hackathons & Competitions** | Diagram-first Smart India Hackathon presentation engineering, 6-slide system, visual decision trees, and jury defense strategy. | ✅ Production |
 
 ---
 
@@ -125,7 +125,7 @@ pptxgenjs/
 
 ---
 
-## 🏆 Featured Skill: `sih-presentation-builder`
+## 🏆 Featured Skill: `hackathon-presentation-builder`
 
 **Build research-backed, visually strong Smart India Hackathon presentations using a structured workflow for problem analysis, narrative design, evidence, diagrams, technical communication, SIH compliance, and iterative visual review.**
 
@@ -134,7 +134,7 @@ Reverse-engineered from **50 official SIH winning presentations** (including *Te
 ### 🏛️ Package Architecture
 
 ```
-sih-presentation-builder/
+hackathon-presentation-builder/
 ├── SKILL.md                          # Master instruction file with YAML frontmatter
 ├── README.md                         # Skill documentation and installation guide
 └── references/
