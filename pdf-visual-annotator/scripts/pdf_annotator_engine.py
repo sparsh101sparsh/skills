@@ -386,6 +386,41 @@ class PDFCanvas:
         r = pymupdf.Rect(rect)
         self.page.insert_image(r, filename=filename, stream=stream, overlay=overlay)
 
+    def insert_latex(
+        self,
+        rect: Union[pymupdf.Rect, Tuple[float, float, float, float]],
+        latex_str: str,
+        fontsize: float = 12.0,
+        color: str = "#1e293b",
+        dpi: int = 300,
+    ) -> None:
+        """
+        Renders a LaTeX mathematical expression via Matplotlib MathText (Computer Modern font)
+        and inserts it onto the page at rect with a transparent background.
+        """
+        import io
+        import matplotlib.pyplot as plt
+        plt.rcParams["mathtext.fontset"] = "cm"
+
+        fig = plt.figure(figsize=(0.1, 0.1), dpi=dpi)
+        fig.patch.set_alpha(0.0)
+        t = fig.text(0, 0, latex_str, fontsize=fontsize, color=color, usetex=False)
+        fig.canvas.draw()
+        bbox = t.get_window_extent(fig.canvas.get_renderer())
+        w_in = max(0.2, (bbox.width + 12) / dpi)
+        h_in = max(0.15, (bbox.height + 8) / dpi)
+        plt.close(fig)
+
+        fig, ax = plt.subplots(figsize=(w_in, h_in), dpi=dpi)
+        fig.patch.set_alpha(0.0)
+        ax.axis("off")
+        ax.text(0.5, 0.5, latex_str, fontsize=fontsize, color=color, ha="center", va="center", usetex=False)
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight", transparent=True, dpi=dpi, pad_inches=0.01)
+        plt.close(fig)
+        self.insert_image(rect, stream=buf.getvalue(), overlay=True)
+
 
 # ==============================================================================
 # 3. Geometry3D — 3D Polyhedra & Prism Renderer
@@ -500,6 +535,87 @@ class Geometry3D:
         if label_vertices:
             for name, pt in v.items():
                 canvas.draw_badge(pt, name, radius=9, bg_color=PALETTE["neutral_dark"], text_color=PALETTE["white"], fontsize=8)
+
+        return v
+
+    @classmethod
+    def draw_canonical_triangular_prism(
+        cls,
+        canvas: PDFCanvas,
+        v_front_left: Tuple[float, float] = (120, 430),
+        side: float = 150,
+        height: float = 155,
+        depth_dx: float = 165,
+        depth_dy: float = -95,
+        primary_color: RGBColor = PALETTE["primary"],
+        fill_opacity: float = 0.45,
+        dashed_hidden: bool = True,
+        label_vertices: bool = True,
+    ) -> Dict[str, pymupdf.Point]:
+        """
+        Renders the canonical 3D triangular prism (textbook optical model):
+        - Front triangular face in the foreground: V1 (bottom-left), V2 (bottom-right), V3 (apex).
+        - Depth vector (depth_dx, depth_dy) recedes BACKWARDS into 3D scene.
+        - Occluded rear-bottom-left vertex V1' has 3 DASHED edges pointing backwards.
+        - Right lateral face and front triangular face shaded with realistic lighting.
+        """
+        V1 = pymupdf.Point(v_front_left[0], v_front_left[1])
+        V2 = pymupdf.Point(v_front_left[0] + side, v_front_left[1])
+        V3 = pymupdf.Point(v_front_left[0] + side / 2.0, v_front_left[1] - height)
+
+        V1_prime = pymupdf.Point(V1.x + depth_dx, V1.y + depth_dy)
+        V2_prime = pymupdf.Point(V2.x + depth_dx, V2.y + depth_dy)
+        V3_prime = pymupdf.Point(V3.x + depth_dx, V3.y + depth_dy)
+
+        v = {
+            "V1": V1, "V2": V2, "V3": V3,
+            "V1_prime": V1_prime, "V2_prime": V2_prime, "V3_prime": V3_prime,
+        }
+
+        # 1. Shaded visible faces
+        # Right lateral face (V2, V2_prime, V3_prime, V3)
+        canvas.shape.draw_polyline([V2, V2_prime, V3_prime, V3, V2])
+        canvas.shape.finish(
+            fill=primary_color,
+            color=primary_color,
+            width=2.0,
+            fill_opacity=fill_opacity * 0.85,
+            closePath=True,
+        )
+
+        # Front triangular face (V1, V2, V3)
+        canvas.shape.draw_polyline([V1, V2, V3, V1])
+        canvas.shape.finish(
+            fill=(min(1.0, primary_color[0] + 0.15), min(1.0, primary_color[1] + 0.15), min(1.0, primary_color[2] + 0.15)),
+            color=primary_color,
+            width=2.0,
+            fill_opacity=fill_opacity * 1.2,
+            closePath=True,
+        )
+
+        # 2. Dashed hidden interior edges pointing backwards to V1'
+        if dashed_hidden:
+            canvas.draw_line(V1, V1_prime, color=(0.48, 0.52, 0.56), width=1.8, dashes="[5 5] 0")
+            canvas.draw_line(V1_prime, V2_prime, color=(0.48, 0.52, 0.56), width=1.8, dashes="[5 5] 0")
+            canvas.draw_line(V1_prime, V3_prime, color=(0.48, 0.52, 0.56), width=1.8, dashes="[5 5] 0")
+
+        # 3. Solid visible edges
+        canvas.draw_line(V3, V3_prime, color=primary_color, width=2.0)
+        canvas.draw_line(V2, V2_prime, color=primary_color, width=2.0)
+        canvas.draw_line(V2_prime, V3_prime, color=primary_color, width=2.0)
+
+        # 4. Vertex badges
+        if label_vertices:
+            labels = {
+                "V_1": (V1, primary_color),
+                "V_2": (V2, primary_color),
+                "V_3": (V3, primary_color),
+                "V_1'": (V1_prime, (0.48, 0.52, 0.56)),
+                "V_2'": (V2_prime, (0.48, 0.52, 0.56)),
+                "V_3'": (V3_prime, (0.48, 0.52, 0.56)),
+            }
+            for name, (pt, col) in labels:
+                canvas.draw_badge(pt, name, radius=9.5, bg_color=col, text_color=(1, 1, 1), fontsize=8)
 
         return v
 
