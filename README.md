@@ -38,6 +38,7 @@ This repository houses verified, production-hardened skills for:
 | [`forensic-doc-verifier`](./forensic-doc-verifier/) | `v1.0.0` | **Security & Forensics** | ICAO Doc 9303 MRZ parsing (7-3-1 check digits), passport validation, and visual Error Level Analysis (ELA). | ✅ Production |
 | [`api-security-auditor`](./api-security-auditor/) | `v1.0.0` | **Security & Penetration Testing** | Automated OWASP API Top 10 scanner for SQL injection, path traversal, and auth boundary probes. | ✅ Production |
 | [`hackathon-presentation-builder`](./hackathon-presentation-builder/) | `v1.0.0` | **Hackathons & Competitions** | Diagram-first Smart India Hackathon presentation engineering, 6-slide system, visual decision trees, and jury defense strategy. | ✅ Production |
+| [`pdf-visual-annotator`](./pdf-visual-annotator/) | `v1.0.0` | **Document Engineering & Visualization** | Precision vector diagramming, arrows over images, 3D geometric prisms, and step-by-step DSA algorithm visualizer via PyMuPDF. | ✅ Production |
 
 ---
 
@@ -235,6 +236,25 @@ python3 forensic-doc-verifier/scripts/ela_analyzer.py passport_scan.jpg -o ela_h
 python3 forensic-doc-verifier/scripts/verify_document.py --mrz mrz_input.txt --image passport_scan.jpg
 ```
 
+### pdf-visual-annotator (PDF Vector Diagramming & 3D Geometry)
+
+```bash
+# 1. Draw arrow and callout on PDF page or over embedded image
+python3 pdf-visual-annotator/scripts/pdf_annotator_cli.py arrow -i input.pdf -o output.pdf --start 100 150 --end 300 150 --color "#e02424"
+
+# 2. Render 3D isometric triangular prism with shaded faces & dashed hidden lines
+python3 pdf-visual-annotator/scripts/pdf_annotator_cli.py prism --type triangular -o prism.pdf --cx 300 --cy 380 --side 140 --height 180
+
+# 3. Generate multi-page step-by-step DSA algorithm walkthrough deck
+python3 pdf-visual-annotator/scripts/pdf_annotator_cli.py dsa-demo --algorithm binary-search -o binary_search_deck.pdf
+
+# 4. Run standalone examples
+python3 pdf-visual-annotator/examples/annotate_over_image.py
+python3 pdf-visual-annotator/examples/draw_3d_prism.py
+python3 pdf-visual-annotator/examples/dsa_binary_search_steps.py
+python3 pdf-visual-annotator/examples/dsa_tree_visualizer.py
+```
+
 ---
 
 ## 📋 Verification & Testing
@@ -257,9 +277,14 @@ npm test --prefix pptxgenjs
 node pptxgenjs/tests/verify.js
 ```
 
-### 2. `pptx-engineer` Structural Validation
+### 3. `pptx-engineer` Structural Validation
 ```bash
 python3 pptx-engineer/scripts/validate.py modified.pptx --original deck.pptx
+```
+
+### 4. `pdf-visual-annotator` Automated Test Suite
+```bash
+python3 -m unittest pdf-visual-annotator/tests/test_pdf_annotator.py
 ```
 
 ### Verification Checklist
