@@ -39,6 +39,7 @@ This repository houses verified, production-hardened skills for:
 | [`api-security-auditor`](./api-security-auditor/) | `v1.0.0` | **Security & Penetration Testing** | Automated OWASP API Top 10 scanner for SQL injection, path traversal, and auth boundary probes. | ✅ Production |
 | [`hackathon-presentation-builder`](./hackathon-presentation-builder/) | `v1.0.0` | **Hackathons & Competitions** | Diagram-first Smart India Hackathon presentation engineering, 6-slide system, visual decision trees, and jury defense strategy. | ✅ Production |
 | [`pdf-visual-annotator`](./pdf-visual-annotator/) | `v1.0.0` | **Document Engineering & Visualization** | Precision vector diagramming, arrows over images, 3D geometric prisms, and step-by-step DSA algorithm visualizer via PyMuPDF. | ✅ Production |
+| [`thenuke`](./thenuke/) | `v1.0.0` | **Documentation Synthesis & Vector PDF** | Multi-modal documentation engine ingesting YouTube (720p), web, and local files into Roman Hinglish reference manuals with PyMuPDF vector diagrams. | ✅ Production |
 
 ---
 
