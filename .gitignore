@@ -47,3 +47,6 @@ yarn-error.log*
 # Generated presentations & artifacts
 *.pptx
 
+*.pdf
+output/
+thenuke/output/
