@@ -41,6 +41,7 @@ from reportlab.platypus import (
 )
 
 from scripts.diagramming.vector_diagrams import get_diagram
+from scripts.diagramming.math_renderer import create_math_flowable
 from scripts.quotes.quote_library import get_quote
 
 logger = logging.getLogger(__name__)
@@ -62,99 +63,537 @@ COLOR_BORDER_CODE = colors.HexColor("#777777")
 COLOR_BG_CODE = colors.HexColor("#EFEFEF")
 COLOR_BORDER_CALLOUT = colors.HexColor("#444444")
 COLOR_BG_CALLOUT = colors.HexColor("#F8F8F8")
+COLOR_BG_LIGHT = colors.HexColor("#F8F8F8")
+COLOR_BORDER_CARD = colors.HexColor("#CCCCCC")
+COLOR_DARK_GREY = colors.HexColor("#444444")
 COLOR_WHITE = colors.HexColor("#FFFFFF")
 
 
+LATEX_N_MACROS = {
+    "ne", "neq", "notin", "neg", "nu", "nabla", "natural", "nearrow", "nwarrow",
+    "nexists", "normalsize", "noindent", "newline", "nobreak", "number", "not",
+    "newcommand", "newenvironment", "null"
+}
+
+VALID_HTML_ENTITIES_RE = re.compile(
+    r"&(?!(?:amp|lt|gt|quot|apos|"
+    r"le|ge|ne|equiv|middot|times|plusmn|minus|divide|"
+    r"isin|notin|sub|sube|sup|supe|cup|cap|empty|"
+    r"asymp|sim|infin|Sigma|Pi|forall|exist|"
+    r"alpha|beta|gamma|lambda|pi|theta|sigma|"
+    r"radic|rArr|rarr|larr|hArr|bull|and|or|not|"
+    r"#\d+|#x[0-9a-fA-F]+);)"
+)
+
+
+def normalize_and_sanitize_markdown(text: str) -> str:
+    """Pre-flight normalization and defense against escape artifacts and broken delimiters."""
+    if not text:
+        return ""
+
+    # Normalize line endings
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Step 1: Shield inline code `...`
+    codes: List[str] = []
+    def code_store(m: re.Match) -> str:
+        idx = len(codes)
+        codes.append(m.group(0))
+        return f"___PRE_CODE_PH_{idx}___"
+    text = re.sub(r"`[^`]+`", code_store, text)
+
+    # Step 2: Convert literal \n- or \n• or \n* into real newline bullets
+    text = re.sub(r"\\n\s*[-*•]\s*", "\n• ", text)
+
+    # Step 3: Match literal \n where it is an unescaped newline artifact
+    def n_replacer(m: re.Match) -> str:
+        full = m.group(0)
+        after = m.group(1)
+        word_m = re.match(r"^[a-zA-Z]+", after)
+        if word_m:
+            macro_candidate = "n" + word_m.group(0).lower()
+            if macro_candidate in LATEX_N_MACROS:
+                return "\\n" + after  # keep \ne, \neq, \notin intact!
+            return "\n" + after
+        return "\n" + after
+
+    text = re.sub(r"\\n([a-zA-Z0-9 .,;!?:()\[\]{}<>=+\-*/_]*|$)", n_replacer, text)
+
+    # Step 4: Convert ASCII tab characters to 4 spaces
+    text = text.replace("\t", "    ")
+
+    # Step 5a: Convert Codeforces triple dollars $$$...$$$ to single dollar $...$
+    text = re.sub(r"\$\$\$([^\$]+?)\$\$\$", r"$\1$", text)
+
+    # Step 5b: Normalize inline math \(...\) to $...$
+    text = re.sub(r"\\\(\s*([^\n\r]+?)\s*\\\)", r"$\1$", text)
+
+    # Step 5c: Convert raw escaped percent symbols
+    text = text.replace(r"\%", "%")
+
+    # Step 6: Restore inline code
+    for idx, c in enumerate(codes):
+        text = text.replace(f"___PRE_CODE_PH_{idx}___", c)
+
+    return text
+
+
+def emergency_xml_repair(text: str) -> str:
+    """Repairs broken XML tags, unescaped ampersands/brackets, and unclosed tags for ReportLab Paragraphs."""
+    # 1. Escape bare ampersands
+    text = VALID_HTML_ENTITIES_RE.sub("&amp;", text)
+    # 2. Escape all < and > that are not strictly valid paired ReportLab tags
+    text = re.sub(r"<(?!(?:/?(?:b|i|font(?:\s+[^>]+)?|super|sub)\b|br\s*/?>))", "&lt;", text)
+
+    # 3. Strip unknown font faces: only allow standard/safe font names
+    def font_replacer(m: re.Match) -> str:
+        attrs = m.group(1) or ""
+        face_m = re.search(r"""face=['"]([^'"]+)['"]""", attrs)
+        safe_faces = {"Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Courier", "Courier-Bold", "Times-Roman"}
+        if face_m and face_m.group(1) not in safe_faces:
+            attrs = re.sub(r"""face=['"][^'"]+['"]""", "", attrs).strip()
+        size_m = re.search(r"""size=['"]([^'"]+)['"]""", attrs)
+        size_part = f' size="{size_m.group(1)}"' if size_m else ""
+        face_part = f' face="{face_m.group(1)}"' if face_m and face_m.group(1) in safe_faces else ""
+        res = f"<font{face_part}{size_part}>".replace("  ", " ")
+        return res if res != "<font>" else "<font>"
+
+    text = re.sub(r"<font(\s+[^>]*)?>", font_replacer, text)
+
+    # 4. Remove orphaned closing tags and ensure all opened tags are closed
+    for tag in ["b", "i", "super", "sub", "font"]:
+        opens = len(re.findall(rf"<{tag}(?:\s+[^>]+)?>", text))
+        closes = len(re.findall(rf"</{tag}>", text))
+        if closes > opens:
+            diff = closes - opens
+            for _ in range(diff):
+                text = re.sub(rf"</{tag}>", "", text, count=1)
+        elif opens > closes:
+            text += f"</{tag}>" * (opens - closes)
+    return text
+
+
+def safe_paragraph(html: str, style: Any) -> Paragraph:
+    """Creates a ReportLab Paragraph with automatic fallback on ExpatError or formatting errors.
+    
+    Guaranteed NEVER to raise an exception under any circumstances.
+    """
+    try:
+        return Paragraph(html, style)
+    except Exception as exc1:
+        logger.warning(f"ReportLab Paragraph parsing error: {exc1}. Applying emergency XML sanitization.")
+        try:
+            clean_html = emergency_xml_repair(html)
+            return Paragraph(clean_html, style)
+        except Exception as exc2:
+            logger.warning(f"ReportLab Paragraph secondary parse error: {exc2}. Stripping markup to plain text.")
+            plain = re.sub(r"<[^>]+>", "", html)
+            plain = plain.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            try:
+                return Paragraph(plain, style)
+            except Exception:
+                safe_text = re.sub(r"[^\x20-\x7E\n]", " ", plain)
+                return Paragraph(safe_text, style)
+
+
 def latex_to_reportlab_html(tex: str) -> str:
-    """Translates LaTeX math expressions into ReportLab Paragraph rich-text markup."""
     t = tex.strip().strip("$")
     if not t:
         return ""
 
-    # Fractions: \frac{num}{den} -> (num / den)
+    # 1. Pre-sanitize LaTeX text escapes and escaped symbols
+    t = re.sub(r"\\text\{\\textasciicircum\}|\\textasciicircum|\^\{\}", "^", t)
+    t = re.sub(r"\\text\{\\textasciitilde\}|\\textasciitilde|~", "~", t)
+    t = re.sub(r"\\%", "%", t)
+    t = re.sub(r"\\&", "&amp;", t)
+    t = t.replace(r"\_", "@@UNDERSCORE@@")
+    t = re.sub(r"\\#", "#", t)
+    t = re.sub(r"\\\$", "$", t)
+
+    # 2. Environments: cases, matrix, aligned
+    t = re.sub(r"\\begin\{(?:cases|matrix|pmatrix|bmatrix|aligned|array)\}(.*?)\\end\{(?:cases|matrix|pmatrix|bmatrix|aligned|array)\}",
+               lambda m: " [ " + m.group(1).replace(r"\\", "; ").replace("&", " ") + " ] ", t, flags=re.DOTALL)
+
+    # 3. Escape bare XML characters in raw LaTeX
+    t = t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    t = re.sub(r"&amp;(?:amp;)+", "&amp;", t)
+
+    # 4. Fractions, roots, and binomials WITH DEPTH TRACKING
+    while r"\frac" in t:
+        idx = t.find(r"\frac")
+        if idx == -1:
+            break
+        open1 = t.find("{", idx)
+        if open1 == -1:
+            break
+        depth = 1
+        close1 = -1
+        for j in range(open1 + 1, len(t)):
+            if t[j] == "{":
+                depth += 1
+            elif t[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    close1 = j
+                    break
+        if close1 == -1:
+            break
+        open2 = t.find("{", close1)
+        if open2 == -1 or open2 > close1 + 3:
+            break
+        depth = 1
+        close2 = -1
+        for j in range(open2 + 1, len(t)):
+            if t[j] == "{":
+                depth += 1
+            elif t[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    close2 = j
+                    break
+        if close2 == -1:
+            break
+        num = t[open1 + 1 : close1].strip()
+        den = t[open2 + 1 : close2].strip()
+        t = t[:idx] + f"({num} / {den})" + t[close2 + 1 :]
+
+    # Depth tracking for \sqrt
+    while r"\sqrt" in t:
+        idx = t.find(r"\sqrt")
+        if idx == -1:
+            break
+        if idx + 5 < len(t) and t[idx + 5] == "[":
+            close_bracket = t.find("]", idx + 5)
+            if close_bracket != -1 and close_bracket + 1 < len(t) and t[close_bracket + 1] == "{":
+                root_idx = t[idx + 6 : close_bracket].strip()
+                open1 = close_bracket + 1
+                depth = 1
+                close1 = -1
+                for j in range(open1 + 1, len(t)):
+                    if t[j] == "{":
+                        depth += 1
+                    elif t[j] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            close1 = j
+                            break
+                if close1 != -1:
+                    inner = t[open1 + 1 : close1].strip()
+                    t = t[:idx] + f"&radic;[{root_idx}]({inner})" + t[close1 + 1 :]
+                    continue
+        open1 = t.find("{", idx)
+        if open1 == -1 or open1 > idx + 6:
+            t = t[:idx] + "&radic;" + t[idx + 5:]
+            continue
+        depth = 1
+        close1 = -1
+        for j in range(open1 + 1, len(t)):
+            if t[j] == "{":
+                depth += 1
+            elif t[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    close1 = j
+                    break
+        if close1 == -1:
+            t = t[:idx] + "&radic;" + t[idx + 5:]
+            continue
+        inner = t[open1 + 1 : close1].strip()
+        t = t[:idx] + f"&radic;({inner})" + t[close1 + 1 :]
+
+    for _ in range(2):
+        t = re.sub(r"\\binom\{([^{}]+)\}\{([^{}]+)\}", r"C(\1, \2)", t)
+        t = re.sub(r"\{([^{}]+)\s*\\choose\s*([^{}]+)\}", r"C(\1, \2)", t)
+        t = re.sub(r"\{([^{}]+)\s*\\over\s*([^{}]+)\}", r"(\1 / \2)", t)
+
+    # 5. Floor and Ceiling functions
     for _ in range(3):
-        t = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1 / \2)", t)
-        t = re.sub(r"\^\{([^{}]+)\}", r"<super>\1</super>", t)
-        t = re.sub(r"_\{([^{}]+)\}", r"<sub>\1</sub>", t)
+        t = re.sub(r"(?:\\left\s*)?\\lfloor\s*(.*?)\s*(?:\\right\s*)?\\rfloor", r"floor(\1)", t)
+        t = re.sub(r"(?:\\left\s*)?\\lceil\s*(.*?)\s*(?:\\right\s*)?\\rceil", r"ceil(\1)", t)
+    t = re.sub(r"(?:\\left\s*)?\\lfloor", "floor(", t)
+    t = re.sub(r"(?:\\right\s*)?\\rfloor", ")", t)
+    t = re.sub(r"(?:\\left\s*)?\\lceil", "ceil(", t)
+    t = re.sub(r"(?:\\right\s*)?\\rceil", ")", t)
 
-    # Single-char super and sub
-    t = re.sub(r"\^([a-zA-Z0-9+\-])", r"<super>\1</super>", t)
-    t = re.sub(r"_([a-zA-Z0-9+\-])", r"<sub>\1</sub>", t)
+    # 6. Overline, underline, and accents
+    t = re.sub(r"\\overline\{([^{}]+)\}", r"\1", t)
+    t = re.sub(r"\\underline\{([^{}]+)\}", r"<u>\1</u>", t)
+    t = re.sub(r"\\(?:bar|vec|hat|tilde)\{([^{}]+)\}", r"\1", t)
 
-    # Mathematical symbols and operators
+    # 7. Font and style wrappers
+    t = re.sub(r"\\operatorname\{([^{}]+)\}", r"\1", t)
+    t = re.sub(r"\\(?:text|mathrm|textsf)\{([^{}]+)\}", r"\1", t)
+    t = re.sub(r"\\(?:mathbf|mathbb)\{([^{}]+)\}", r"<b>\1</b>", t)
+    t = re.sub(r"\\(?:mathit|mathcal)\{([^{}]+)\}", r"<i>\1</i>", t)
+    t = re.sub(r"\\mathtt\{([^{}]+)\}", r'<font face="Courier">\1</font>', t)
+
+    # 8. Delimiter modifiers to strip
+    t = re.sub(r"\\(?:left|right)\.", "", t)
+    t = re.sub(r"\\(?:left|right|big|Big|bigg|Bigg)", "", t)
+    t = re.sub(r"\\(?:displaystyle|textstyle|scriptstyle|scriptscriptstyle|limits|nolimits)", "", t)
+
+    # 9. Spacing macros
+    t = re.sub(r"\\(?:quad|qquad)", "  ", t)
+    t = re.sub(r"\\[,:;! ]", " ", t)
+
+    # 10. Operator and symbol replacements
     replacements = [
-        (r"\\le\b|\\leq\b", "&le;"),
-        (r"\\ge\b|\\geq\b", "&ge;"),
-        (r"\\neq\b|\\ne\b", "&ne;"),
-        (r"\\cdot\b", "&middot;"),
-        (r"\\times\b", "&times;"),
-        (r"\\pm\b", "&plusmn;"),
-        (r"\\in\b", "&isin;"),
-        (r"\\notin\b", "&notin;"),
-        (r"\\approx\b", "&asymp;"),
-        (r"\\infty\b", "&infin;"),
-        (r"\\sum\b", "&Sigma;"),
-        (r"\\prod\b", "&Pi;"),
-        (r"\\oplus\b", "&#8853;"),
-        (r"\\dots\b|\\ldots\b", "..."),
-        (r"\\cdots\b", "&middot;&middot;&middot;"),
-        (r"\\alpha\b", "&alpha;"),
-        (r"\\beta\b", "&beta;"),
-        (r"\\gamma\b", "&gamma;"),
-        (r"\\lambda\b", "&lambda;"),
-        (r"\\pi\b", "&pi;"),
-        (r"\\theta\b", "&theta;"),
-        (r"\\sigma\b", "&sigma;"),
-        (r"\\gcd\b", "gcd"),
-        (r"\\min\b", "min"),
-        (r"\\max\b", "max"),
-        (r"\\log\b", "log"),
-        (r"\\bmod\b", "mod"),
-        (r"\\pmod\{([^{}]+)\}", r"(mod \1)"),
-        (r"\\mathcal\{([^{}]+)\}", r"<i>\1</i>"),
-        (r"\\mathbf\{([^{}]+)\}", r"<b>\1</b>"),
-        (r"\\text\{([^{}]+)\}", r"\1"),
-        (r"\\left\(", "("),
-        (r"\\right\)", ")"),
-        (r"\\left\[", "["),
-        (r"\\right\]", "]"),
+        (r"\\le(?![a-zA-Z])|\\leq(?![a-zA-Z])", "&le;"),
+        (r"\\ge(?![a-zA-Z])|\\geq(?![a-zA-Z])", "&ge;"),
+        (r"\\neq(?![a-zA-Z])|\\ne(?![a-zA-Z])", "&ne;"),
+        (r"\\equiv(?![a-zA-Z])", "&#8801;"),
+        (r"\\approx(?![a-zA-Z])", "&asymp;"),
+        (r"\\sim(?![a-zA-Z])", "~"),
+        (r"\\cong(?![a-zA-Z])", "&#8773;"),
+        (r"\\ll(?![a-zA-Z])", "&lt;&lt;"),
+        (r"\\gg(?![a-zA-Z])", "&gt;&gt;"),
+        (r"\\mid(?![a-zA-Z])", "|"),
+        (r"\\nmid(?![a-zA-Z])", "&#8740;"),
+        (r"\\parallel(?![a-zA-Z])", "||"),
+        (r"\\perp(?![a-zA-Z])", "&#8869;"),
+        (r"\\propto(?![a-zA-Z])", "&prop;"),
+        (r"\\in(?![a-zA-Z])", "&isin;"),
+        (r"\\notin(?![a-zA-Z])", "&notin;"),
+        (r"\\subset(?![a-zA-Z])", "&sub;"),
+        (r"\\subseteq(?![a-zA-Z])", "&sube;"),
+        (r"\\supset(?![a-zA-Z])", "&sup;"),
+        (r"\\supseteq(?![a-zA-Z])", "&supe;"),
+        (r"\\cup(?![a-zA-Z])", "&cup;"),
+        (r"\\cap(?![a-zA-Z])", "&cap;"),
+        (r"\\setminus(?![a-zA-Z])", r" \\ "),
+        (r"\\empty(?![a-zA-Z])|\\emptyset(?![a-zA-Z])|\\varnothing(?![a-zA-Z])", "&empty;"),
+        (r"\\forall(?![a-zA-Z])", "&forall;"),
+        (r"\\exists(?![a-zA-Z])", "&exist;"),
+        (r"\\land(?![a-zA-Z])|\\wedge(?![a-zA-Z])", "&and;"),
+        (r"\\lor(?![a-zA-Z])|\\vee(?![a-zA-Z])", "&or;"),
+        (r"\\neg(?![a-zA-Z])", "&not;"),
+        (r"\\times(?![a-zA-Z])", "&times;"),
+        (r"\\cdot(?![a-zA-Z])", "&middot;"),
+        (r"\\pm(?![a-zA-Z])", "&plusmn;"),
+        (r"\\mp(?![a-zA-Z])", "&#8723;"),
+        (r"\\div(?![a-zA-Z])", "&divide;"),
+        (r"\\oplus(?![a-zA-Z])", "&#8853;"),
+        (r"\\otimes(?![a-zA-Z])", "&#8855;"),
+        (r"\\odot(?![a-zA-Z])", "&#8857;"),
+        (r"\\ast(?![a-zA-Z])|\\star(?![a-zA-Z])", "*"),
+        (r"\\circ(?![a-zA-Z])", "&#9702;"),
+        (r"\\bullet(?![a-zA-Z])", "&bull;"),
+        (r"\\sum(?![a-zA-Z])", "&Sigma;"),
+        (r"\\prod(?![a-zA-Z])", "&Pi;"),
+        (r"\\infty(?![a-zA-Z])", "&infin;"),
+        (r"\\int(?![a-zA-Z])", "&int;"),
+        (r"\\to(?![a-zA-Z])|\\rightarrow(?![a-zA-Z])", "&rarr;"),
+        (r"\\leftarrow(?![a-zA-Z])|\\gets(?![a-zA-Z])", "&larr;"),
+        (r"\\leftrightarrow(?![a-zA-Z])", "&harr;"),
+        (r"\\implies(?![a-zA-Z])|\\Rightarrow(?![a-zA-Z])", "&rArr;"),
+        (r"\\Leftarrow(?![a-zA-Z])", "&lArr;"),
+        (r"\\iff(?![a-zA-Z])|\\Leftrightarrow(?![a-zA-Z])", "&hArr;"),
+        (r"\\dots(?![a-zA-Z])|\\ldots(?![a-zA-Z])", "..."),
+        (r"\\cdots(?![a-zA-Z])", "&middot;&middot;&middot;"),
+        (r"\\vdots(?![a-zA-Z])", "..."),
+        (r"\\ddots(?![a-zA-Z])", "..."),
+        (r"\\alpha(?![a-zA-Z])", "&alpha;"),
+        (r"\\beta(?![a-zA-Z])", "&beta;"),
+        (r"\\gamma(?![a-zA-Z])", "&gamma;"),
+        (r"\\delta(?![a-zA-Z])", "&delta;"),
+        (r"\\epsilon(?![a-zA-Z])|\\varepsilon(?![a-zA-Z])", "&epsilon;"),
+        (r"\\zeta(?![a-zA-Z])", "&zeta;"),
+        (r"\\eta(?![a-zA-Z])", "&eta;"),
+        (r"\\theta(?![a-zA-Z])", "&theta;"),
+        (r"\\iota(?![a-zA-Z])", "&iota;"),
+        (r"\\kappa(?![a-zA-Z])", "&kappa;"),
+        (r"\\lambda(?![a-zA-Z])", "&lambda;"),
+        (r"\\mu(?![a-zA-Z])", "&mu;"),
+        (r"\\nu(?![a-zA-Z])", "&nu;"),
+        (r"\\xi(?![a-zA-Z])", "&xi;"),
+        (r"\\pi(?![a-zA-Z])", "&pi;"),
+        (r"\\rho(?![a-zA-Z])", "&rho;"),
+        (r"\\sigma(?![a-zA-Z])", "&sigma;"),
+        (r"\\tau(?![a-zA-Z])", "&tau;"),
+        (r"\\upsilon(?![a-zA-Z])", "&upsilon;"),
+        (r"\\phi(?![a-zA-Z])|\\varphi(?![a-zA-Z])", "&phi;"),
+        (r"\\chi(?![a-zA-Z])", "&chi;"),
+        (r"\\psi(?![a-zA-Z])", "&psi;"),
+        (r"\\omega(?![a-zA-Z])", "&omega;"),
+        (r"\\Gamma(?![a-zA-Z])", "&Gamma;"),
+        (r"\\Delta(?![a-zA-Z])", "&Delta;"),
+        (r"\\Theta(?![a-zA-Z])", "&Theta;"),
+        (r"\\Lambda(?![a-zA-Z])", "&Lambda;"),
+        (r"\\Xi(?![a-zA-Z])", "&Xi;"),
+        (r"\\Pi(?![a-zA-Z])", "&Pi;"),
+        (r"\\Sigma(?![a-zA-Z])", "&Sigma;"),
+        (r"\\Phi(?![a-zA-Z])", "&Phi;"),
+        (r"\\Psi(?![a-zA-Z])", "&Psi;"),
+        (r"\\Omega(?![a-zA-Z])", "&Omega;"),
+        (r"\\langle(?![a-zA-Z])", "&#10216;"),
+        (r"\\rangle(?![a-zA-Z])", "&#10217;"),
         (r"\\\{", "{"),
         (r"\\\}", "}"),
-        (r"\\ ", " "),
-        (r"\\quad", "  "),
-        (r"\\sqrt\{([^{}]+)\}", r"&radic;(\1)"),
+        (r"\\pmod\{([^{}]+)\}", r"(mod \1)"),
+        (r"\\pmod\s+([a-zA-Z0-9]+)", r"(mod \1)"),
+        (r"\\bmod(?![a-zA-Z])", "mod"),
+        (r"\\gcd(?![a-zA-Z])", "gcd"),
+        (r"\\lcm(?![a-zA-Z])", "lcm"),
+        (r"\\min(?![a-zA-Z])", "min"),
+        (r"\\max(?![a-zA-Z])", "max"),
+        (r"\\log(?![a-zA-Z])", "log"),
+        (r"\\ln(?![a-zA-Z])", "ln"),
+        (r"\\exp(?![a-zA-Z])", "exp"),
+        (r"\\det(?![a-zA-Z])", "det"),
+        (r"\\deg(?![a-zA-Z])", "deg"),
+        (r"\\dim(?![a-zA-Z])", "dim"),
+        (r"\\sin(?![a-zA-Z])", "sin"),
+        (r"\\cos(?![a-zA-Z])", "cos"),
+        (r"\\tan(?![a-zA-Z])", "tan"),
     ]
     for pattern, rep in replacements:
         t = re.sub(pattern, rep, t)
 
-    # Protect remaining XML chars
-    t = t.replace("<", "&lt;").replace(">", "&gt;")
-    # Restore allowed ReportLab tags
-    t = t.replace("&lt;super&gt;", "<super>").replace("&lt;/super&gt;", "</super>")
-    t = t.replace("&lt;sub&gt;", "<sub>").replace("&lt;/sub&gt;", "</sub>")
-    t = t.replace("&lt;i&gt;", "<i>").replace("&lt;/i&gt;", "</i>")
-    t = t.replace("&lt;b&gt;", "<b>").replace("&lt;/b&gt;", "</b>")
+    # 11. Standalone minus signs to &minus;
+    t = re.sub(r"(?<![a-zA-Z0-9&])-(?=[a-zA-Z0-9(\[])", "&minus;", t)
+    t = re.sub(r"(\s)-(\s)", r"\1&minus;\2", t)
+    t = re.sub(r"([0-9a-zA-Z\)])-([0-9a-zA-Z\(])", r"\1 &minus; \2", t)
 
-    return f'<font face="Helvetica-Oblique">{t}</font>'
+    # 12. Superscripts and subscripts WITH DEPTH TRACKING
+    while "^{" in t:
+        idx = t.find("^{")
+        open_pos = idx + 1
+        depth = 1
+        close_pos = -1
+        for j in range(open_pos + 1, len(t)):
+            if t[j] == "{":
+                depth += 1
+            elif t[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    close_pos = j
+                    break
+        if close_pos == -1:
+            break
+        inner = t[open_pos + 1 : close_pos]
+        t = t[:idx] + f'<super><font size="6.5">{inner}</font></super>' + t[close_pos + 1 :]
+
+    t = re.sub(r"\^([a-zA-Z0-9+\-°])", r'<super><font size="6.5">\1</font></super>', t)
+
+    while "_{" in t:
+        idx = t.find("_{")
+        open_pos = idx + 1
+        depth = 1
+        close_pos = -1
+        for j in range(open_pos + 1, len(t)):
+            if t[j] == "{":
+                depth += 1
+            elif t[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    close_pos = j
+                    break
+        if close_pos == -1:
+            break
+        inner = t[open_pos + 1 : close_pos]
+        t = t[:idx] + f'<sub><font size="6.5">{inner}</font></sub>' + t[close_pos + 1 :]
+
+    t = re.sub(r"(?<!@)_([a-zA-Z0-9+\-])", r'<sub><font size="6.5">\1</font></sub>', t)
+
+    # 13. Variables italicization
+    UPRIGHT_WORDS = {
+        "gcd", "lcm", "min", "max", "log", "ln", "exp", "mod", "abs", "sin", "cos", "tan",
+        "floor", "ceil", "deg", "det", "dim", "inf", "sup", "font", "size", "super", "sub"
+    }
+
+    parts = re.split(r"(<[^>]+>|&[a-zA-Z0-9#]+;)", t)
+    in_bold = False
+    for i, part in enumerate(parts):
+        if not part:
+            continue
+        if part.startswith("<"):
+            if part.startswith("<b>"):
+                in_bold = True
+            elif part.startswith("</b>"):
+                in_bold = False
+            continue
+        if part.startswith("&"):
+            continue
+        if in_bold:
+            continue
+        def repl_var(m: re.Match) -> str:
+            w = m.group(0)
+            if "@@UNDERSCORE@@" in w:
+                return w
+            if w.lower() in UPRIGHT_WORDS:
+                return w
+            if len(w) == 1 and w.isalpha():
+                return f"<i>{w}</i>"
+            if len(w) == 2 and w in {"dp", "sz", "in", "id", "ok", "op"}:
+                return f"<i>{w}</i>"
+            return w
+        parts[i] = re.sub(r"\b[a-zA-Z0-9@_]+\b", repl_var, part)
+
+    t = "".join(parts)
+
+    # 14. UNIVERSAL FALLBACK / MACRO EXTINGUISHER
+    for _ in range(3):
+        t = re.sub(r"\\[a-zA-Z]+\{([^{}]+)\}", r"\1", t)
+    t = re.sub(r"\\([a-zA-Z]+)", r"\1", t)
+    t = re.sub(r"(?<![a-zA-Z0-9])\{([^{}]+)\}(?![a-zA-Z0-9])", r"\1", t)
+    t = t.replace("\\", "")
+
+    # Restore shielded underscores
+    t = t.replace("@@UNDERSCORE@@", "_")
+
+    return t
+
+
+def compute_table_col_widths(
+    num_cols: int,
+    col_weights: list,
+    content_width: float = CONTENT_WIDTH,
+) -> list:
+    """Computes dynamic table column widths using iterative floor clamping (water-filling).
+
+    Guarantees:
+    1. Narrow columns never compress below min_w (48.0 pt / 60.0 pt / 85.0 pt).
+    2. Total width sums exactly to content_width without overflow or truncation.
+    3. Wide/dominant columns absorb available remaining width proportionally.
+    """
+    if num_cols <= 0:
+        return []
+    if num_cols == 1:
+        return [content_width]
+
+    min_w = 48.0 if num_cols >= 5 else (60.0 if num_cols >= 4 else 85.0)
+    min_w = min(min_w, content_width / num_cols)
+    raw_widths = [0.0] * num_cols
+    fixed_cols = set()
+
+    while True:
+        unfixed_cols = [c for c in range(num_cols) if c not in fixed_cols]
+        if not unfixed_cols:
+            break
+        unfixed_weight = sum(col_weights[c] for c in unfixed_cols) or 1.0
+        avail_width = max(0.0, content_width - sum(raw_widths[c] for c in fixed_cols))
+        newly_clamped = False
+        for c in unfixed_cols:
+            w = (col_weights[c] / unfixed_weight) * avail_width
+            if w < min_w:
+                raw_widths[c] = min_w
+                fixed_cols.add(c)
+                newly_clamped = True
+        if not newly_clamped:
+            for c in unfixed_cols:
+                raw_widths[c] = (col_weights[c] / unfixed_weight) * avail_width
+            break
+
+    return [round(w, 2) for w in raw_widths]
+
 
 
 def md_to_reportlab_html(text: str) -> str:
     """Safely converts markdown bold, italic, code, LaTeX math, and escapes XML entities for ReportLab Paragraphs."""
-    # 0. Extract math into placeholders to protect from HTML tag escaping
-    text = text.replace("\U0001D54F", "")
-    maths: List[str] = []
-    def math_store(m: re.Match) -> str:
-        raw_tex = m.group(1)
-        rendered = latex_to_reportlab_html(raw_tex)
-        idx = len(maths)
-        maths.append(rendered)
-        return f"___MATH_PH_{idx}___"
+    # 0. Clean unprintable glyphs and normalize line endings
+    text = normalize_and_sanitize_markdown(text)
 
-    # Display math $$...$$ first, then inline math $...$
-    text = re.sub(r"\$\$([^\$]+)\$\$", math_store, text)
-    text = re.sub(r"\$([^\$]+)\$", math_store, text)
-
-    # 1. Extract inline code `foo` into placeholders to prevent cross-interaction with ** and entity escaping
+    # 1. Extract inline code `foo` into placeholders FIRST to prevent cross-interaction with $ and entities
     codes: List[str] = []
     def code_store(m: re.Match) -> str:
         raw = m.group(1)
@@ -165,33 +604,70 @@ def md_to_reportlab_html(text: str) -> str:
 
     text = re.sub(r"`([^`]+)`", code_store, text)
 
-    # 2. Escape bare & that are not already valid HTML entities
-    text = re.sub(r"&(?!(?:amp|lt|gt|quot|le|ge|ne|middot|times|plusmn|isin|notin|asymp|infin|Sigma|Pi|alpha|beta|gamma|lambda|pi|theta|sigma|radic|#\d+|#x[0-9a-fA-F]+);)", "&amp;", text)
+    # 2. Extract math into placeholders NEXT
+    # Protect escaped dollar signs
+    text = text.replace(r"\$", "___ESCAPED_DOLLAR___")
 
-    # 3. Convert **bold** to <b>bold</b>
+    maths: List[str] = []
+    def math_store(m: re.Match) -> str:
+        raw_tex = m.group(1)
+        rendered = latex_to_reportlab_html(raw_tex)
+        idx = len(maths)
+        maths.append(rendered)
+        return f"___MATH_PH_{idx}___"
+
+    # Display math $$...$$ and \[...\] first (strictly within block)
+    text = re.sub(r"\\\[(.*?)\\\]", math_store, text, flags=re.DOTALL)
+    text = re.sub(r"\$\$([^\$]+?)\$\$", math_store, text, flags=re.DOTALL)
+    # Inline math \(...\) and $...$ (strictly single-line, Pandoc-compliant non-space boundary)
+    text = re.sub(r"\\\((.+?)\\\)", math_store, text)
+    text = re.sub(r"(?<!\\)\$(?!\s)([^\$\n\r]+?)(?<!\s)\$", math_store, text)
+
+    # 2b. Sanitize bare LaTeX operators that leaked outside math blocks
+    bare_replacements = [
+        (r"\\le(?![a-zA-Z])|\\leq(?![a-zA-Z])", "&le;"),
+        (r"\\ge(?![a-zA-Z])|\\geq(?![a-zA-Z])", "&ge;"),
+        (r"\\ne(?![a-zA-Z])|\\neq(?![a-zA-Z])", "&ne;"),
+        (r"\\times(?![a-zA-Z])", "&times;"),
+        (r"\\cdot(?![a-zA-Z])", "&middot;"),
+        (r"\\pm(?![a-zA-Z])", "&plusmn;"),
+        (r"\\approx(?![a-zA-Z])", "&asymp;"),
+        (r"\\equiv(?![a-zA-Z])", "&#8801;"),
+        (r"\\in(?![a-zA-Z])", "&isin;"),
+        (r"\\notin(?![a-zA-Z])", "&notin;"),
+        (r"\\to(?![a-zA-Z])|\\rightarrow(?![a-zA-Z])", "&rarr;"),
+        (r"\\implies(?![a-zA-Z])|\\Rightarrow(?![a-zA-Z])", "&rArr;"),
+        (r"\\dots(?![a-zA-Z])|\\ldots(?![a-zA-Z])", "..."),
+        (r"\\cdots(?![a-zA-Z])", "..."),
+    ]
+    for pattern, rep in bare_replacements:
+        text = re.sub(pattern, rep, text)
+
+    # 3. Escape bare & that are not already valid HTML entities
+    text = VALID_HTML_ENTITIES_RE.sub("&amp;", text)
+
+    # 4. Convert **bold** to <b>bold</b>
     text = re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", text)
 
-    # 4. Convert *italic* to <i>italic</i>
+    # 5. Convert *italic* to <i>italic</i>
     text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<i>\1</i>", text)
 
-    # 5. Escape any remaining < or > that aren't allowed ReportLab tags
-    def tag_cleaner(m: re.Match) -> str:
-        tag = m.group(0)
-        if re.match(r"^</?(?:b|i|font(?:\s+[^>]+)?|super|sub|br/?)>$", tag):
-            return tag
-        return tag.replace("<", "&lt;").replace(">", "&gt;")
+    # 6. Escape any remaining < or > that aren't allowed ReportLab tags
+    text = re.sub(r"<(?!(?:/?(?:b|i|font(?:\s+[^>]+)?|super|sub)\b|br\s*/?>))", "&lt;", text)
 
-    text = re.sub(r"<[^>]*>", tag_cleaner, text)
-    # Also escape standalone <
-    text = re.sub(r"<(?!(?:/?(?:b|i|font|super|sub|br)))", "&lt;", text)
-
-    # 6. Restore code placeholders
+    # 7. Restore code placeholders
     for idx, c_html in enumerate(codes):
         text = text.replace(f"___CODE_PH_{idx}___", c_html)
 
-    # 7. Restore math placeholders
+    # 8. Restore math placeholders
     for idx, m_html in enumerate(maths):
         text = text.replace(f"___MATH_PH_{idx}___", m_html)
+
+    # 9. Restore shielded dollar signs
+    text = text.replace("___ESCAPED_DOLLAR___", "$")
+
+    # 10. Emergency XML repair to guarantee valid markup
+    text = emergency_xml_repair(text)
 
     return text
 
@@ -201,7 +677,7 @@ class PublicationCanvas(canvas.Canvas):
 
     doc_title: str = "Git: The Complete Reference Manual"
     edition_label: str = "Monochrome Reference Edition"
-    author_branding: str = "Prepared by @issparsh @sumitsingh097"
+    author_branding: str = "Prepared by @issparsh"
 
     is_cp: bool = False
 
@@ -284,9 +760,11 @@ class PublicationCanvas(canvas.Canvas):
 class ReferenceManualBuilder:
     """Builds an archival reference manual conforming to the style specification."""
 
-    def __init__(self, output_path: Union[str, Path], topic: str = "Git"):
+    def __init__(self, output_path: Union[str, Path], topic: str = "Git", branding: Optional[str] = None):
         self.output_path = Path(output_path)
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.topic = topic
+        self.branding = branding
         self.styles = self._init_styles()
 
     def _init_styles(self) -> Dict[str, ParagraphStyle]:
@@ -347,36 +825,36 @@ class ReferenceManualBuilder:
         styles["TOCHeader"] = ParagraphStyle(
             "TOCHeader",
             fontName="Helvetica-Bold",
-            fontSize=12.0,
-            leading=16.0,
+            fontSize=14.0,
+            leading=18.0,
             textColor=COLOR_BLACK,
-            spaceAfter=4,
+            spaceAfter=8,
         )
         styles["TOCSub"] = ParagraphStyle(
             "TOCSub",
             fontName="Helvetica",
-            fontSize=8.5,
-            leading=12.0,
+            fontSize=9.0,
+            leading=13.0,
             textColor=COLOR_MUTED,
             spaceAfter=8,
         )
         styles["TOCPhase"] = ParagraphStyle(
             "TOCPhase",
             fontName="Helvetica-Bold",
-            fontSize=10.0,
-            leading=14.0,
+            fontSize=11.0,
+            leading=15.0,
             textColor=COLOR_BLACK,
-            spaceBefore=6,
-            spaceAfter=2,
+            spaceBefore=10,
+            spaceAfter=4,
         )
         styles["TOCChapter"] = ParagraphStyle(
             "TOCChapter",
             fontName="Helvetica",
-            fontSize=8.5,
-            leading=12.0,
+            fontSize=9.5,
+            leading=13.0,
             textColor=COLOR_CHARCOAL,
-            leftIndent=10,
-            spaceAfter=2,
+            leftIndent=18,
+            spaceAfter=3,
         )
         styles["TOCSummary"] = ParagraphStyle(
             "TOCSummary",
@@ -424,7 +902,7 @@ class ReferenceManualBuilder:
             fontSize=11.0,
             leading=15.0,
             textColor=COLOR_BLACK,
-            spaceBefore=10,
+            spaceBefore=14,
             spaceAfter=4,
             keepWithNext=True,
         )
@@ -432,7 +910,7 @@ class ReferenceManualBuilder:
             "Body",
             fontName="Helvetica",
             fontSize=10.0,
-            leading=14.0,
+            leading=15.5,
             textColor=COLOR_CHARCOAL,
             spaceAfter=6,
         )
@@ -609,7 +1087,7 @@ class ReferenceManualBuilder:
             ],
             [
                 Paragraph("Author Branding:", self.styles["CoverMetaLabel"]),
-                Paragraph("Prepared by @issparsh @sumitsingh097", self.styles["CoverMetaVal"]),
+                Paragraph(self.branding or "Prepared by @issparsh", self.styles["CoverMetaVal"]),
             ],
             [
                 Paragraph("Visual Design:", self.styles["CoverMetaLabel"]),
@@ -716,8 +1194,8 @@ class ReferenceManualBuilder:
 
     def make_callout_box(self, header: str, body_text: str) -> KeepTogether:
         """Create a styled callout box flowable with border and soft background."""
-        head_p = Paragraph(f"<b>{header}</b>", self.styles["CalloutHead"])
-        body_p = Paragraph(md_to_reportlab_html(body_text.strip()), self.styles["CalloutBody"])
+        head_p = safe_paragraph(f"<b>{header}</b>", self.styles["CalloutHead"])
+        body_p = safe_paragraph(md_to_reportlab_html(body_text.strip()), self.styles["CalloutBody"])
         t = Table([[head_p], [body_p]], colWidths=[CONTENT_WIDTH])
         t.setStyle(
             TableStyle([
@@ -731,11 +1209,29 @@ class ReferenceManualBuilder:
         )
         return KeepTogether([t, Spacer(1, 8)])
 
+    def make_formula_box(self, math_content: str) -> KeepTogether:
+        """Create an isolated, centered mathematical formula card flowable."""
+        clean_html = latex_to_reportlab_html(math_content)
+        p = safe_paragraph(f"<b>{clean_html}</b>", self.styles.get("Formula", self.styles["Body"]))
+        t = Table([[p]], colWidths=[CONTENT_WIDTH])
+        t.setStyle(
+            TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), COLOR_BG_LIGHT),
+                ("BOX", (0, 0), (-1, -1), 0.5, COLOR_BORDER_CARD),
+                ("TOPPADDING", (0, 0), (-1, -1), 5.0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5.0),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12.0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12.0),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ])
+        )
+        return KeepTogether([Spacer(1, 2.5), t, Spacer(1, 3.5)])
+
     def make_sample_box(self, sample_idx: int, input_text: str, output_text: str, explanation: str = "") -> KeepTogether:
         """Create a side-by-side monospaced Codeforces-style sample input/output table."""
-        title_p = Paragraph(f"<b>Sample {sample_idx}</b>", self.styles.get("SampleTitle", self.styles["SectionHeader"]))
-        in_head = Paragraph("<b>Input</b>", self.styles.get("SampleHeader", self.styles["Body"]))
-        out_head = Paragraph("<b>Output</b>", self.styles.get("SampleHeader", self.styles["Body"]))
+        title_p = safe_paragraph(f"<b>Sample {sample_idx}</b>", self.styles.get("SampleTitle", self.styles["SectionHeader"]))
+        in_head = safe_paragraph("<b>Input</b>", self.styles.get("SampleHeader", self.styles["Body"]))
+        out_head = safe_paragraph("<b>Output</b>", self.styles.get("SampleHeader", self.styles["Body"]))
 
         in_lines = "<br/>".join([
             line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace(" ", "&nbsp;")
@@ -746,8 +1242,8 @@ class ReferenceManualBuilder:
             for line in output_text.strip().splitlines()
         ]) or "&nbsp;"
 
-        in_body = Paragraph(in_lines, self.styles.get("SampleText", self.styles["CodeText"]))
-        out_body = Paragraph(out_lines, self.styles.get("SampleText", self.styles["CodeText"]))
+        in_body = safe_paragraph(in_lines, self.styles.get("SampleText", self.styles["CodeText"]))
+        out_body = safe_paragraph(out_lines, self.styles.get("SampleText", self.styles["CodeText"]))
 
         col_w = CONTENT_WIDTH / 2.0
 
@@ -772,7 +1268,7 @@ class ReferenceManualBuilder:
 
         elements = [title_p, Spacer(1, 2), t]
         if explanation:
-            exp_p = Paragraph(f"<i>Explanation:</i> {md_to_reportlab_html(explanation.strip())}", self.styles.get("SampleExplanation", self.styles["Body"]))
+            exp_p = safe_paragraph(f"<i>Explanation:</i> {md_to_reportlab_html(explanation.strip())}", self.styles.get("SampleExplanation", self.styles["Body"]))
             elements.extend([Spacer(1, 3), exp_p])
         elements.append(Spacer(1, 6))
         return KeepTogether(elements)
@@ -780,7 +1276,7 @@ class ReferenceManualBuilder:
     def make_cp_meta_bar(self, meta_markdown: str) -> KeepTogether:
         """Create a shaded, elegant metadata summary bar for CP problems."""
         meta_html = md_to_reportlab_html(meta_markdown.strip())
-        meta_p = Paragraph(meta_html, self.styles.get("CPMetaBar", self.styles["Body"]))
+        meta_p = safe_paragraph(meta_html, self.styles.get("CPMetaBar", self.styles["Body"]))
         t = Table([[meta_p]], colWidths=[CONTENT_WIDTH])
         t.setStyle(
             TableStyle([
@@ -797,6 +1293,7 @@ class ReferenceManualBuilder:
     def parse_markdown_to_flowables(self, md_text: str) -> List[Any]:
         """Parse structured markdown manual into publication flowables."""
         story: List[Any] = []
+        md_text = normalize_and_sanitize_markdown(md_text)
         lines = md_text.splitlines()
         i = 0
         n = len(lines)
@@ -820,7 +1317,7 @@ class ReferenceManualBuilder:
                 if is_cp_doc:
                     title_text = line.lstrip("# ").strip()
                     story.append(Spacer(1, 4))
-                    story.append(Paragraph(title_text, self.styles["PhaseHeader"]))
+                    story.append(safe_paragraph(title_text, self.styles["PhaseHeader"]))
                     story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_BLACK, spaceBefore=4, spaceAfter=8))
                     i += 1
                     continue
@@ -858,33 +1355,34 @@ class ReferenceManualBuilder:
                     safe_page_break()
                 in_syllabus = True
                 clean_title = re.sub(r"^#+\s*", "", line.strip("=").strip())
-                story.append(Paragraph(clean_title, self.styles["TOCHeader"]))
+                story.append(safe_paragraph(clean_title, self.styles["TOCHeader"]))
                 story.append(HRFlowable(width="100%", thickness=1.0, color=COLOR_BLACK, spaceBefore=4, spaceAfter=6))
                 i += 1
                 continue
 
             # End of Syllabus Index
-            if line.strip() == "<!-- END SYLLABUS -->":
+            if line.strip() == "<!-- END SYLLABUS -->" or (in_syllabus and (line.startswith("# ") or re.match(r"^#{1,3}\s+(?:MODULE|PHASE|PART)\b", line, re.IGNORECASE))):
                 in_syllabus = False
                 safe_page_break()
-                i += 1
-                continue
+                if line.strip() == "<!-- END SYLLABUS -->":
+                    i += 1
+                    continue
 
             if in_syllabus:
                 if line.startswith("PHASE ") or re.match(r"^(?:PART|Phase)\s+[IVXLCDM\d]+", line, re.IGNORECASE):
-                    story.append(Paragraph(line.strip(), self.styles["TOCPhase"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCPhase"]))
                 elif line.startswith("Topics:"):
-                    story.append(Paragraph(line.strip(), self.styles["TOCSub"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCSub"]))
                 elif line.startswith("Chapter "):
-                    story.append(Paragraph(line.strip(), self.styles["TOCChapter"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCChapter"]))
                 elif line.startswith("Hands-On Challenges:"):
-                    story.append(Paragraph(line.strip(), self.styles["TOCSummary"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCSummary"]))
                 elif line.startswith("Deep Dive "):
-                    story.append(Paragraph(line.strip(), self.styles["TOCChapter"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCChapter"]))
                 elif line.startswith("APPENDICES"):
-                    story.append(Paragraph(line.strip(), self.styles["TOCPhase"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCPhase"]))
                 else:
-                    story.append(Paragraph(line.strip(), self.styles["TOCSub"]))
+                    story.append(safe_paragraph(line.strip(), self.styles["TOCSub"]))
                 i += 1
                 continue
 
@@ -896,12 +1394,12 @@ class ReferenceManualBuilder:
             if re.match(r"^(?:#{1,3}\s*)?PART\s+[IVXLCDM\d]+", line, re.IGNORECASE):
                 safe_page_break()
                 part_title = line.lstrip("# ").strip()
-                story.append(Paragraph(part_title, self.styles["TOCPhase"]))
+                story.append(safe_paragraph(part_title, self.styles["TOCPhase"]))
                 i += 1
                 while i < n and (not lines[i].strip() or re.match(r"^[-=_*]{3,}$", lines[i].strip())):
                     i += 1
-                if i < n and re.match(r"^(?:#{1,3}\s*)?PHASE\s+\d+\s*(?:—|-|:)", lines[i], re.IGNORECASE):
-                    story.append(Paragraph(lines[i].lstrip("# ").strip(), self.styles["PhaseHeader"]))
+                if i < n and re.match(r"^(?:#{1,3}\s*)?(?:PHASE|MODULE|CHAPTER)\s+\d+", lines[i], re.IGNORECASE):
+                    story.append(safe_paragraph(lines[i].lstrip("# ").strip(), self.styles["PhaseHeader"]))
                     story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_BLACK, spaceBefore=4, spaceAfter=8))
                     i += 1
                 continue
@@ -909,14 +1407,24 @@ class ReferenceManualBuilder:
             # 1. Phase Header (starts on fresh page)
             if re.match(r"^(?:#{1,3}\s*)?PHASE\s+\d+\s*—\s*PRACTICE DRILLS", line, re.IGNORECASE):
                 story.append(Spacer(1, 14))
-                story.append(Paragraph(line.lstrip("# ").strip(), self.styles["PhaseHeader"]))
+                story.append(safe_paragraph(line.lstrip("# ").strip(), self.styles["PhaseHeader"]))
                 story.append(HRFlowable(width="100%", thickness=1.0, color=COLOR_BLACK, spaceBefore=4, spaceAfter=8))
                 i += 1
                 continue
 
-            if re.match(r"^(?:#{1,3}\s*)?PHASE\s+\d+\s*(?:—|-|:)", line, re.IGNORECASE):
-                safe_page_break()
-                story.append(Paragraph(line.lstrip("# ").strip(), self.styles["PhaseHeader"]))
+            if re.match(r"^(?:#{1,3}\s*)?(?:PHASE|MODULE|CHAPTER)\s+\d+", line, re.IGNORECASE):
+                prev_is_part = False
+                for elem in reversed(story):
+                    if isinstance(elem, Spacer) or isinstance(elem, HRFlowable):
+                        continue
+                    if isinstance(elem, Paragraph) and elem.style.name in ("TOCPhase", "PhaseHeader"):
+                        prev_is_part = True
+                    break
+                if not prev_is_part:
+                    safe_page_break()
+                else:
+                    story.append(Spacer(1, 14))
+                story.append(safe_paragraph(line.lstrip("# ").strip(), self.styles["PhaseHeader"]))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_BLACK, spaceBefore=4, spaceAfter=8))
                 i += 1
                 continue
@@ -924,7 +1432,7 @@ class ReferenceManualBuilder:
             # 2. Appendices Header (starts on fresh page)
             if re.match(r"^(?:#{1,3}\s*)?APPENDICES", line, re.IGNORECASE):
                 safe_page_break()
-                story.append(Paragraph(line.lstrip("# ").strip(), self.styles["PhaseHeader"]))
+                story.append(safe_paragraph(line.lstrip("# ").strip(), self.styles["PhaseHeader"]))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=COLOR_BLACK, spaceBefore=4, spaceAfter=8))
                 i += 1
                 continue
@@ -932,33 +1440,33 @@ class ReferenceManualBuilder:
             # 3. Topics Bar
             if line.startswith("Topics:") or line.startswith("**Topics:**"):
                 topic_text = line.replace("**Topics:**", "").replace("Topics:", "").strip()
-                story.append(Paragraph(f"<b>Topics:</b> {topic_text}", self.styles["TopicsLabel"]))
+                story.append(safe_paragraph(f"<b>Topics:</b> {topic_text}", self.styles["TopicsLabel"]))
                 i += 1
                 continue
 
             # 4. Scope Bar (in Appendices)
             if line.startswith("Scope:"):
                 scope_text = line.replace("Scope:", "").strip()
-                story.append(Paragraph(f"<b>Scope:</b> {scope_text}", self.styles["TopicsLabel"]))
+                story.append(safe_paragraph(f"<b>Scope:</b> {scope_text}", self.styles["TopicsLabel"]))
                 i += 1
                 continue
 
             # 5. Chapter Header
             if re.match(r"^(?:#{2,3}\s*)?Chapter\s+\d+\.\d+", line, re.IGNORECASE) or line.startswith("## Appendix"):
                 ch_title = line.lstrip("# ").strip()
-                story.append(Paragraph(ch_title, self.styles["ChapterHeader"]))
+                story.append(safe_paragraph(ch_title, self.styles["ChapterHeader"]))
                 i += 1
                 continue
 
             # 6. Challenge Header
             if re.match(r"^(?:#{2,3}\s*)?CHALLENGE\s+\d+", line, re.IGNORECASE):
                 ch_title = line.lstrip("# ").strip()
-                story.append(Paragraph(ch_title, self.styles["ChallengeTitle"]))
+                story.append(safe_paragraph(ch_title, self.styles["ChallengeTitle"]))
                 i += 1
                 continue
 
             if "Problem Statement & Requirements:" in line:
-                story.append(Paragraph("<b>Problem Statement & Requirements:</b>", self.styles["ChallengeReq"]))
+                story.append(safe_paragraph("<b>Problem Statement & Requirements:</b>", self.styles["ChallengeReq"]))
                 i += 1
                 continue
 
@@ -967,7 +1475,7 @@ class ReferenceManualBuilder:
                 sec_title = line.lstrip("# ").strip()
                 if "Senior Architect Analysis" in sec_title:
                     safe_page_break()
-                story.append(Paragraph(sec_title, self.styles["SectionHeader"]))
+                story.append(safe_paragraph(sec_title, self.styles["SectionHeader"]))
                 i += 1
                 continue
 
@@ -1030,14 +1538,45 @@ class ReferenceManualBuilder:
                 i += 1
                 continue
 
-            # 7e. Display Math Block: $$ formula $$
-            if line.strip().startswith("$$") and line.strip().endswith("$$") and len(line.strip()) > 4:
-                math_content = line.strip()[2:-2].strip()
-                html_m = latex_to_reportlab_html(math_content)
-                story.append(Spacer(1, 4))
-                story.append(Paragraph(html_m, self.styles["DisplayMath"]))
-                story.append(Spacer(1, 4))
-                i += 1
+            # 7e. Display Math Block: \[ ... \] or $$ ... $$ (single-line or multi-line)
+            s_line = line.strip()
+            if s_line.startswith(r"\[") or s_line.startswith("$$"):
+                is_bracket = s_line.startswith(r"\[")
+                delimiter = r"\]" if is_bracket else "$$"
+                start_delim = r"\[" if is_bracket else "$$"
+
+                math_content = ""
+                # Check single-line display math
+                if is_bracket and s_line.endswith(r"\]") and len(s_line) >= 4:
+                    math_content = s_line[2:-2].strip()
+                    i += 1
+                elif not is_bracket and s_line.endswith("$$") and len(s_line) >= 4 and s_line != "$$":
+                    math_content = s_line[2:-2].strip()
+                    i += 1
+                else:
+                    # Multi-line display math
+                    math_lines = []
+                    if s_line != start_delim:
+                        math_lines.append(s_line[len(start_delim):].strip())
+                    i += 1
+                    while i < n:
+                        curr_line = lines[i]
+                        curr_s = curr_line.strip()
+                        if curr_s.endswith(delimiter):
+                            if curr_s != delimiter:
+                                math_lines.append(curr_s[:-len(delimiter)].strip())
+                            i += 1
+                            break
+                        else:
+                            math_lines.append(curr_line.rstrip())
+                            i += 1
+                    math_content = "\n".join(math_lines).strip()
+
+                if math_content:
+                    math_flowable = create_math_flowable(math_content, is_display=True, styles=self.styles)
+                    story.append(Spacer(1, 4))
+                    story.append(math_flowable)
+                    story.append(Spacer(1, 4))
                 continue
 
             # 8. Callout Box: [MENTAL MODEL], [ENGINEERING GOTCHA], [INTERVIEW TIP], [INVARIANT], [RULE]
@@ -1060,10 +1599,10 @@ class ReferenceManualBuilder:
                 if i < n and lines[i].strip().startswith("```"):
                     line = lines[i].rstrip()
 
-            if line.startswith("```"):
+            if line.strip().startswith("```"):
                 code_lines = []
                 i += 1
-                while i < n and not lines[i].startswith("```"):
+                while i < n and not lines[i].strip().startswith("```"):
                     code_lines.append(lines[i])
                     i += 1
                 i += 1  # consume closing ```
@@ -1074,12 +1613,23 @@ class ReferenceManualBuilder:
             # 10. Bullet Points
             if line.strip().startswith(("• ", "- ", "* ")):
                 bullet_text = line.strip()[2:].strip()
-                story.append(Paragraph(f"• {md_to_reportlab_html(bullet_text)}", self.styles["Bullet"]))
+                story.append(safe_paragraph(f"• {md_to_reportlab_html(bullet_text)}", self.styles["Bullet"]))
                 i += 1
                 continue
 
             # 11. Regular Body Paragraph
-            story.append(Paragraph(md_to_reportlab_html(line.strip()), self.styles["Body"]))
+            # Defense-in-depth: if line has embedded bullets, split into distinct flowables
+            if "\n• " in line or line.startswith("• "):
+                sub_lines = line.split("\n")
+                for sl in sub_lines:
+                    sl_trimmed = sl.strip()
+                    if sl_trimmed.startswith(("• ", "- ", "* ")):
+                        b_text = sl_trimmed[2:].strip()
+                        story.append(safe_paragraph(f"• {md_to_reportlab_html(b_text)}", self.styles["Bullet"]))
+                    elif sl_trimmed:
+                        story.append(safe_paragraph(md_to_reportlab_html(sl_trimmed), self.styles["Body"]))
+            else:
+                story.append(safe_paragraph(md_to_reportlab_html(line.strip()), self.styles["Body"]))
             i += 1
 
         return story
@@ -1098,15 +1648,22 @@ class ReferenceManualBuilder:
         flowables = self.parse_markdown_to_flowables(markdown_text)
 
         is_cp_doc = (":::sample" in markdown_text or "**Platform:**" in markdown_text or "Problem ID:" in markdown_text)
-        canvas_maker = PublicationCanvas
-        canvas_maker.is_cp = is_cp_doc
-        if is_cp_doc:
-            canvas_maker.doc_title = self.topic
-            canvas_maker.edition_label = "Competitive Programming Reference Edition"
-        else:
-            canvas_maker.doc_title = f"{self.topic}: The Complete Reference Manual"
-            canvas_maker.edition_label = "Monochrome Reference Edition"
+        class _Canvas(PublicationCanvas):
+            pass
 
-        doc.build(flowables, canvasmaker=canvas_maker)
+        _Canvas.is_cp = is_cp_doc
+        if is_cp_doc:
+            _Canvas.doc_title = self.topic
+            _Canvas.edition_label = "Competitive Programming Reference Edition"
+        else:
+            _Canvas.doc_title = f"{self.topic}: The Complete Reference Manual"
+            _Canvas.edition_label = "Monochrome Reference Edition"
+
+        if self.branding is not None:
+            _Canvas.author_branding = self.branding
+        else:
+            _Canvas.author_branding = "Prepared by @issparsh"
+
+        doc.build(flowables, canvasmaker=_Canvas)
         logger.info(f"Published PDF compiled via ReportLab: {self.output_path}")
         return self.output_path

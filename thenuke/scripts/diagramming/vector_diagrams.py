@@ -19,6 +19,7 @@ from reportlab.graphics.shapes import (
     Line,
     Polygon,
     Rect,
+    Circle,
     String,
 )
 from reportlab.lib import colors
@@ -796,6 +797,128 @@ def create_merge_conflict_diagram() -> Drawing:
 
 
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 9b. Lecture Diagrams: Central Codebase, Status Matrix, Collaboration
+# ---------------------------------------------------------------------------
+
+
+def create_central_codebase_diagram() -> Drawing:
+    """Renders the Central Codebase Hub-and-Spoke model vs Peer-to-Peer Zip exchange."""
+    height = 165.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 1.1: Central Codebase Architecture vs Peer-to-Peer Exchange",
+        "Single Source of Truth Hub Eliminating Manual WhatsApp Zip Overwrites",
+    )
+
+    # Center Hub (Central Codebase)
+    hub_x, hub_y, hub_w, hub_h = 165.0, 48.0, 145.0, 65.0
+    g.add(Rect(hub_x, hub_y, hub_w, hub_h, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.5))
+    g.add(String(hub_x + 16, hub_y + 45, "CENTRAL CODEBASE", fontName="Helvetica-Bold", fontSize=9.0, fillColor=COLOR_BLACK))
+    g.add(String(hub_x + 12, hub_y + 30, "Single Source of Truth", fontName="Helvetica-Oblique", fontSize=7.5, fillColor=COLOR_DARK_GREY))
+    g.add(String(hub_x + 22, hub_y + 16, "(GitHub Cloud Remote)", fontName="Courier", fontSize=7.0, fillColor=COLOR_MUTED))
+
+    # Dev 1: Nobita (Left)
+    g.add(Rect(15, 65, 110, 42, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(22, 92, "NOBITA (Dev 1)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+    g.add(String(22, 79, "Feature: Navbar", fontName="Helvetica", fontSize=7.0, fillColor=COLOR_MUTED))
+    _draw_arrow(g, 125, 86, hub_x, 86, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, hub_x, 78, 125, 78, color=COLOR_MUTED, stroke_width=1.0)
+
+    # Dev 2: Gian (Right)
+    g.add(Rect(350, 65, 110, 42, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(358, 92, "GIAN (Dev 2)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+    g.add(String(358, 79, "Feature: Footer", fontName="Helvetica", fontSize=7.0, fillColor=COLOR_MUTED))
+    _draw_arrow(g, 350, 86, hub_x + hub_w, 86, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, hub_x + hub_w, 78, 350, 78, color=COLOR_MUTED, stroke_width=1.0)
+
+    # Dev 3: Shizuka (Bottom Center)
+    g.add(Rect(182, 8, 110, 32, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(190, 26, "SHIZUKA (Dev 3)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(190, 15, "Feature: Hero Section", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_MUTED))
+    _draw_arrow(g, 237, 40, 237, hub_y, color=COLOR_BLACK, stroke_width=1.0)
+
+    # Warning Box: Broken Peer-to-Peer
+    g.add(Rect(15, 8, 145, 45, fillColor=COLOR_BG_LIGHT, strokeColor=COLOR_HAIRLINE, strokeWidth=0.8))
+    g.add(String(20, 40, "[CRISIS: Manual Exchange]", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+    g.add(String(20, 28, "x Gian sends project_final.zip", fontName="Courier", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+    g.add(String(20, 17, "x Overwrites Nobita\'s work", fontName="Courier", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+
+    return d
+
+
+def create_status_matrix_diagram() -> Drawing:
+    """Renders the Two-Column Short Status Matrix (git status -s)."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 3.1: Short Status Matrix Structure (git status -s)",
+        "Column 1: Staging Index State | Column 2: Working Directory State",
+    )
+
+    box_w = 445.0
+    g.add(Rect(15, 12, box_w, 100, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+
+    # Header Row
+    g.add(Rect(15, 87, box_w, 25, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=0.5))
+    g.add(String(25, 96, "RAW OUTPUT", fontName="Courier-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(125, 96, "INDEX (COL 1)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(235, 96, "WORKTREE (COL 2)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(345, 96, "EXPLANATION", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+
+    rows = [
+        ("A  padhai.md", "Added (Staged)", "Pristine", "Ready for commit checkpoint", 68),
+        (" M hisaab.txt", "Unchanged", "Modified (Red)", "Changes exist only on disk", 49),
+        ("AM padhai.md", "Staged (Green)", "Modified (Red)", "Staged, then modified again!", 30),
+        ("?? newfile.js", "Untracked", "Untracked", "Git not observing file", 11),
+    ]
+
+    for raw, c1, c2, expl, y in rows:
+        g.add(String(25, y + 4, raw, fontName="Courier", fontSize=7.0, fillColor=COLOR_BLACK))
+        g.add(String(125, y + 4, c1, fontName="Helvetica", fontSize=7.0, fillColor=COLOR_DARK_GREY))
+        g.add(String(235, y + 4, c2, fontName="Helvetica-Bold" if "Modified" in c2 else "Helvetica", fontSize=7.0, fillColor=COLOR_BLACK if "Modified" in c2 else COLOR_DARK_GREY))
+        g.add(String(345, y + 4, expl, fontName="Helvetica-Oblique", fontSize=7.0, fillColor=COLOR_MUTED))
+        g.add(Line(15, y, 15 + box_w, y, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+
+    return d
+
+
+def create_collaboration_steps_diagram() -> Drawing:
+    """Renders the 12 COMMON STEPS multi-developer collaboration workflow."""
+    height = 150.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 4.1: The 12 COMMON STEPS Team Collaboration Lifecycle",
+        "Lead Setup ➔ GitHub testingtest ➔ Feature Branch ➔ PR Review & Merge",
+    )
+
+    step_w = 98.0
+    step_h = 70.0
+    y_pos = 32.0
+
+    steps = [
+        (15, "1. LEAD INIT", "Repo: testingtest", "git init + README", "git push origin main"),
+        (130, "2. INVITE", "Add lolpoloo", "Pending Invite", "Shivam accepts invite"),
+        (245, "3. FEATURE", "git clone repo", "git switch -c feat", "index.html marquee"),
+        (360, "4. PR & SYNC", "git push feat", "Open Pull Request", "Lead merges + pull"),
+    ]
+
+    for x, s_num, s_l1, s_l2, s_l3 in steps:
+        g.add(Rect(x, y_pos, step_w, step_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+        g.add(Rect(x, y_pos + step_h - 18, step_w, 18, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=0.5))
+        g.add(String(x + 8, y_pos + step_h - 13, s_num, fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+        g.add(String(x + 6, y_pos + 36, s_l1, fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+        g.add(String(x + 6, y_pos + 24, s_l2, fontName="Helvetica", fontSize=6.5, fillColor=COLOR_DARK_GREY))
+        g.add(String(x + 6, y_pos + 12, s_l3, fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED))
+
+    _draw_arrow(g, 113, y_pos + 35, 130, y_pos + 35, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, 228, y_pos + 35, 245, y_pos + 35, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, 343, y_pos + 35, 360, y_pos + 35, color=COLOR_BLACK, stroke_width=1.0)
+
+    return d
+
+
 # 10. Sleep Architecture & Ultradian Cycles Diagram
 # ---------------------------------------------------------------------------
 def create_sleep_architecture_diagram() -> Drawing:
@@ -1309,7 +1432,983 @@ def create_exercise_dosage_diagram() -> Drawing:
 # ---------------------------------------------------------------------------
 # Registry Map
 # ---------------------------------------------------------------------------
+
+def create_cvcs_vs_dvcs_diagram() -> Drawing:
+    """Renders Centralized VCS (SVN) vs Distributed VCS (Git)."""
+    height = 155.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 1.2: Centralized (CVCS) vs Distributed (DVCS) Architecture",
+        "Single Point of Failure (SPOF) vs Autonomous Local Repository Nodes",
+    )
+
+    # Left: CVCS (SVN)
+    g.add(Rect(15, 20, 215, 115, fillColor=COLOR_BG_BOX, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(25, 122, "CENTRALIZED VCS (SVN / CVS)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+    
+    # Central Server Box
+    g.add(Rect(80, 75, 85, 38, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+    g.add(String(90, 98, "CENTRAL SERVER", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_BLACK))
+    g.add(String(92, 85, "(Single Point of Failure)", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED))
+    
+    # Client A and Client B
+    g.add(Rect(25, 30, 80, 28, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=0.8))
+    g.add(String(32, 45, "Client 1: Working Copy", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+    g.add(String(32, 36, "No local history/offline", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED))
+    
+    g.add(Rect(140, 30, 80, 28, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=0.8))
+    g.add(String(147, 45, "Client 2: Working Copy", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+    g.add(String(147, 36, "Requires active network", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED))
+    
+    _draw_arrow(g, 65, 58, 100, 75, stroke_width=0.8)
+    _draw_arrow(g, 180, 58, 145, 75, stroke_width=0.8)
+
+    # Right: DVCS (Git)
+    g.add(Rect(245, 20, 215, 115, fillColor=COLOR_BG_BOX, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(255, 122, "DISTRIBUTED VCS (GIT / DVCS)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+    
+    # Server / Remote Hub
+    g.add(Rect(310, 85, 85, 32, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(320, 104, "SERVER (GitHub)", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_BLACK))
+    g.add(String(322, 92, "Full Mirror Remote", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED))
+    
+    # Client 1 Node (Full Repo)
+    g.add(Rect(255, 28, 90, 38, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(260, 54, "DEV 1: Local Repo", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+    g.add(String(260, 44, "Full History + Commits", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_DARK_GREY))
+    g.add(String(260, 34, "100% Offline Capable", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_MUTED))
+
+    # Client 2 Node (Full Repo)
+    g.add(Rect(360, 28, 90, 38, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(365, 54, "DEV 2: Local Repo", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+    g.add(String(365, 44, "Full History + Commits", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_DARK_GREY))
+    g.add(String(365, 34, "100% Offline Capable", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_MUTED))
+
+    # Sync arrows
+    _draw_arrow(g, 300, 66, 330, 85, stroke_width=0.8)
+    _draw_arrow(g, 330, 85, 300, 66, stroke_width=0.8)
+    _draw_arrow(g, 405, 66, 375, 85, stroke_width=0.8)
+    _draw_arrow(g, 375, 85, 405, 66, stroke_width=0.8)
+    # Peer sync between Dev 1 and Dev 2
+    _draw_arrow(g, 345, 47, 360, 47, stroke_width=0.8)
+    _draw_arrow(g, 360, 47, 345, 47, stroke_width=0.8)
+
+    return d
+
+
+def create_fork_upstream_diagram() -> Drawing:
+    """Renders Open Source Contribution Fork & Upstream Sync Architecture."""
+    height = 160.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 7.1: Open Source Contribution Architecture (Fork & Upstream)",
+        "Canonical Upstream ➔ Personal Fork (Origin) ➔ Local Clone & Cross-Repo PR",
+    )
+
+    # 1. Canonical Upstream Box (Top Left Cloud)
+    g.add(Rect(20, 85, 180, 52, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+    g.add(String(30, 122, "CANONICAL UPSTREAM (GitHub)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(30, 108, "github.com/maintainer/project.git", fontName="Courier", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+    g.add(String(30, 94, "Branch: main (Protected Production)", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED))
+
+    # 2. Personal Fork Box (Top Right Cloud)
+    g.add(Rect(275, 85, 180, 52, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+    g.add(String(285, 122, "PERSONAL FORK (Origin)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(285, 108, "github.com/developer/project.git", fontName="Courier", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+    g.add(String(285, 94, "Branch: feature/fix-issue", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED))
+
+    # Fork Arrow (Upstream -> Fork)
+    _draw_arrow(g, 200, 110, 275, 110, stroke_width=1.0)
+    g.add(String(220, 115, "1. FORK", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+
+    # 3. Local Clone Box (Bottom Center)
+    g.add(Rect(130, 15, 215, 48, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+    g.add(String(140, 48, "LOCAL DEVELOPER MACHINE", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(140, 36, "origin: git@github.com:developer/project.git", fontName="Courier", fontSize=5.5, fillColor=COLOR_DARK_GREY))
+    g.add(String(140, 24, "upstream: git@github.com:maintainer/project.git", fontName="Courier", fontSize=5.5, fillColor=COLOR_DARK_GREY))
+
+    # Clone Arrow (Fork -> Local)
+    _draw_arrow(g, 330, 85, 270, 63, stroke_width=0.8)
+    g.add(String(305, 74, "2. git clone", fontName="Helvetica-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    # Push Arrow (Local -> Fork)
+    _draw_arrow(g, 290, 63, 350, 85, stroke_width=0.8)
+    g.add(String(335, 68, "3. git push", fontName="Helvetica-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    # Pull Request Arrow (Fork -> Upstream)
+    _draw_arrow(g, 275, 125, 200, 125, stroke_width=1.0)
+    g.add(String(208, 130, "4. PULL REQUEST", fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_BLACK))
+
+    # Fetch Upstream Arrow (Upstream -> Local)
+    _draw_arrow(g, 100, 85, 150, 63, stroke_width=0.8)
+    g.add(String(75, 72, "git fetch upstream", fontName="Helvetica-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    return d
+
+
+
+def create_git_vs_github_diagram() -> Drawing:
+    """Renders Git vs GitHub Architectural Comparison Matrix."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 1.3: Git vs GitHub Architectural Comparison Matrix",
+        "Local Content-Addressable Engine vs Cloud Hosting & Collaboration Platform",
+    )
+
+    # Headers
+    g.add(Rect(15, 100, 215, 22, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(25, 106, "GIT  (Local Machine Engine)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+
+    g.add(Rect(245, 100, 215, 22, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(255, 106, "GITHUB  (Cloud Collaboration Hub)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+
+    rows = [
+        ("Core Identity", "Command-Line Tool / Distributed VCS", "Cloud Web Service & Remote Host"),
+        ("Execution", "100% Offline (Zero Network Needed)", "Requires Internet Access & Web API"),
+        ("Storage Scope", "Local .git/ database on hard disk", "Remote Bare Repositories in Cloud"),
+        ("Key Features", "Branching, Staging Index, DAG Commits", "Pull Requests, Code Review, CI/CD"),
+    ]
+
+    y = 80
+    for idx, (label, git_val, gh_val) in enumerate(rows):
+        bg = COLOR_BG_BOX if idx % 2 == 0 else COLOR_WHITE
+        g.add(Rect(15, y - 4, 215, 18, fillColor=bg, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+        g.add(String(20, y + 2, f"• {git_val}", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_BLACK))
+
+        g.add(Rect(245, y - 4, 215, 18, fillColor=bg, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+        g.add(String(250, y + 2, f"• {gh_val}", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_BLACK))
+
+        y -= 20
+
+    return d
+
+
+def create_dot_git_internals_diagram() -> Drawing:
+    """Renders internal directory structure of .git repository database."""
+    height = 160.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 2.2: Internal Architecture of the .git Directory",
+        "Component Breakdown: HEAD Pointer, Index Cache, Object Database & Refs",
+    )
+
+    # Root Box (Left)
+    g.add(Rect(15, 30, 95, 95, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.5))
+    g.add(String(25, 102, ".git/", fontName="Courier-Bold", fontSize=13.0, fillColor=COLOR_BLACK))
+    g.add(String(25, 86, "Repository Root", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_BLACK))
+    g.add(String(25, 72, "The local database", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+    g.add(String(25, 62, "and cryptographic", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+    g.add(String(25, 52, "engine of Git.", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+    g.add(String(25, 38, "[CRITICAL ENGINE]", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_MUTED))
+
+    # Connector Lines
+    _draw_arrow(g, 110, 112, 135, 112, stroke_width=0.8)
+    _draw_arrow(g, 110, 92, 135, 92, stroke_width=0.8)
+    _draw_arrow(g, 110, 72, 135, 72, stroke_width=0.8)
+    _draw_arrow(g, 110, 52, 135, 52, stroke_width=0.8)
+    _draw_arrow(g, 110, 32, 135, 32, stroke_width=0.8)
+
+    # 5 Component Cards (Right)
+    components = [
+        ("HEAD", "Pointer to current branch or commit", "Contains: ref: refs/heads/main (active working context)", 105),
+        ("index", "Binary Staging Area cache layer", "Maps relative file paths to SHA-1 blob hashes in .git/objects", 85),
+        ("objects/", "Content-Addressable Object Database", "Stores zlib-compressed blobs, trees, commits, tags & packfiles", 65),
+        ("refs/", "Pointers to tip commits across timelines", "Subdirs: refs/heads/ (local branches), refs/remotes/, refs/tags/", 45),
+        ("config", "Repository-specific configuration file", "Local settings overriding ~/.gitconfig (remote URLs, branches)", 25),
+    ]
+
+    for name, desc1, desc2, y in components:
+        g.add(Rect(135, y - 5, 325, 18, fillColor=COLOR_BG_BOX, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+        g.add(String(142, y + 2, name, fontName="Courier-Bold", fontSize=7.0, fillColor=COLOR_BLACK))
+        g.add(String(200, y + 2, f"|  {desc1}", fontName="Helvetica-Bold", fontSize=5.8, fillColor=COLOR_BLACK))
+        g.add(String(200, y - 4, f"   {desc2}", fontName="Helvetica-Oblique", fontSize=5.0, fillColor=COLOR_MUTED))
+
+    return d
+
+
+def create_trunk_vs_gitflow_diagram() -> Drawing:
+    """Renders Trunk-Based vs Git Flow Branching Strategy Comparison."""
+    height = 155.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 7.2: Branching Strategy Architecture — Trunk-Based vs Git Flow",
+        "Short-Lived CI Feature Arcs vs Long-Lived Multi-Tier Enterprise Pipeline",
+    )
+
+    # 1. Left Side: Trunk-Based Development
+    g.add(Rect(15, 20, 215, 115, fillColor=COLOR_BG_BOX, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(25, 122, "TRUNK-BASED DEVELOPMENT", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(25, 112, "SaaS / Modern High-Velocity CI/CD", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED))
+
+    # Main Trunk Line
+    g.add(Line(25, 65, 210, 65, strokeColor=COLOR_BLACK, strokeWidth=1.5))
+    g.add(String(180, 56, "main trunk", fontName="Courier-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    # Trunk Commits (Circles)
+    for cx in [40, 75, 110, 145, 175]:
+        g.add(Circle(cx, 65, 3.5, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+
+    # Feature Arc 1 (short-lived)
+    g.add(Line(40, 65, 58, 85, strokeColor=COLOR_DARK_GREY, strokeWidth=1.0))
+    g.add(Line(58, 85, 75, 65, strokeColor=COLOR_DARK_GREY, strokeWidth=1.0))
+    g.add(Circle(58, 85, 2.8, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(45, 90, "feat 1 (1-2 days)", fontName="Helvetica", fontSize=5.0, fillColor=COLOR_DARK_GREY))
+
+    # Feature Arc 2 (short-lived)
+    g.add(Line(110, 65, 128, 85, strokeColor=COLOR_DARK_GREY, strokeWidth=1.0))
+    g.add(Line(128, 85, 145, 65, strokeColor=COLOR_DARK_GREY, strokeWidth=1.0))
+    g.add(Circle(128, 85, 2.8, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(String(115, 90, "feat 2 (<24 hrs)", fontName="Helvetica", fontSize=5.0, fillColor=COLOR_DARK_GREY))
+
+    # Invariants for Trunk
+    g.add(String(25, 38, "• Commits merge to main daily", fontName="Helvetica-Bold", fontSize=5.5, fillColor=COLOR_BLACK))
+    g.add(String(25, 28, "• Automated test suite gate on PRs", fontName="Helvetica", fontSize=5.5, fillColor=COLOR_DARK_GREY))
+
+    # 2. Right Side: Git Flow
+    g.add(Rect(245, 20, 215, 115, fillColor=COLOR_BG_BOX, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(255, 122, "GIT FLOW (ENTERPRISE MODEL)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK))
+    g.add(String(255, 112, "Scheduled Enterprise Releases", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED))
+
+    # Main Line (Top)
+    g.add(Line(255, 95, 440, 95, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+    g.add(String(410, 99, "main (prod)", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_BLACK))
+    g.add(Circle(270, 95, 3.0, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+    g.add(Circle(390, 95, 3.0, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+
+    # Develop Line (Middle)
+    g.add(Line(255, 65, 440, 65, strokeColor=COLOR_BLACK, strokeWidth=1.2))
+    g.add(String(410, 69, "develop", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_BLACK))
+    for cx in [270, 310, 350, 390]:
+        g.add(Circle(cx, 65, 3.0, fillColor=COLOR_WHITE, strokeColor=COLOR_BLACK, strokeWidth=1.0))
+
+    # Feature Branch (Bottom)
+    g.add(Line(270, 65, 290, 42, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    g.add(Line(290, 42, 330, 42, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    g.add(Line(330, 42, 350, 65, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    g.add(Circle(310, 42, 2.5, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=0.8))
+    g.add(String(290, 33, "feature/billing", fontName="Courier", fontSize=5.0, fillColor=COLOR_MUTED))
+
+    # Release Branch
+    g.add(Line(350, 65, 370, 80, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    g.add(Line(370, 80, 390, 95, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    g.add(Line(370, 80, 390, 65, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    g.add(String(355, 84, "release/1.0", fontName="Courier", fontSize=4.8, fillColor=COLOR_MUTED))
+
+    # Invariants for Git Flow
+    g.add(String(255, 24, "• Strict branch roles: develop, release, hotfix", fontName="Helvetica", fontSize=5.2, fillColor=COLOR_DARK_GREY))
+
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Additional Git Publication Vector Diagrams
+# ---------------------------------------------------------------------------
+
+def create_github_ssot_hub_diagram() -> Drawing:
+    """SSOT Hub: GitHub central repo connecting multiple developers."""
+    height = 150.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 1.3: GitHub Remote as Single Source of Truth (SSOT)",
+        "Push/Pull Bidirectional Replication & Asynchronous Coordination",
+    )
+
+    hub_w = 150.0
+    hub_h = 52.0
+    hub_x = (TOTAL_WIDTH - hub_w) / 2.0
+    hub_y = 50.0
+    g.add(Rect(hub_x, hub_y, hub_w, hub_h, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(TOTAL_WIDTH / 2.0, hub_y + 36, "GITHUB REMOTE REPOSITORY", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, hub_y + 24, "testing-test (main branch)", fontName="Courier-Bold", fontSize=7.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, hub_y + 11, "Single Source of Truth (SSOT)", fontName="Helvetica-Oblique", fontSize=6.5, fillColor=COLOR_HAIRLINE, textAnchor="middle"))
+
+    dev_w = 115.0
+    dev_h = 40.0
+    left_x = 18.0
+    g.add(Rect(left_x, 75, dev_w, dev_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(left_x + dev_w / 2.0, 101, "Gian (Australia)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(left_x + dev_w / 2.0, 90, "Local Feature Commits", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+    g.add(String(left_x + dev_w / 2.0, 79, "Like Button & CSS", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    g.add(Rect(left_x, 24, dev_w, dev_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(left_x + dev_w / 2.0, 50, "Shivam (India)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(left_x + dev_w / 2.0, 39, "Local Feature Commits", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+    g.add(String(left_x + dev_w / 2.0, 28, "Marquee & Routing", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    right_x = TOTAL_WIDTH - 18.0 - dev_w
+    g.add(Rect(right_x, 75, dev_w, dev_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(right_x + dev_w / 2.0, 101, "Nobita (India)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(right_x + dev_w / 2.0, 90, "Local Feature Commits", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+    g.add(String(right_x + dev_w / 2.0, 79, "Comment Engine & Auth", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    g.add(Rect(right_x, 24, dev_w, dev_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(right_x + dev_w / 2.0, 50, "Ruchi (London)", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(right_x + dev_w / 2.0, 39, "Local Feature Commits", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+    g.add(String(right_x + dev_w / 2.0, 28, "Footer & Analytics", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    _draw_arrow(g, left_x + dev_w, 95, hub_x, 85, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, hub_x, 80, left_x + dev_w, 90, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, left_x + dev_w, 48, hub_x, 62, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, hub_x, 57, left_x + dev_w, 43, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    _draw_arrow(g, right_x, 95, hub_x + hub_w, 85, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, hub_x + hub_w, 80, right_x, 90, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, right_x, 48, hub_x + hub_w, 62, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, hub_x + hub_w, 57, right_x, 43, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    g.add(String(hub_x - 5, 87, "push/fetch", fontName="Courier-Oblique", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="end"))
+    g.add(String(hub_x + hub_w + 5, 87, "push/fetch", fontName="Courier-Oblique", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="start"))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            10.0,
+            "INVARIANT: Offline commits synchronize via push/pull; zero peer-to-peer runtime dependency.",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_two_pillars_diagram() -> Drawing:
+    """The Two Pillars of Version Control: Local Workspace vs Distributed Collaboration."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 2.1: The Two Pillars of Version Control",
+        "Pillar 1: Local Workspace Management vs Pillar 2: Distributed Collaboration",
+    )
+
+    card_w = 215.0
+    card_h = 98.0
+    y_card = 20.0
+
+    x1 = 15.0
+    g.add(Rect(x1, y_card, card_w, card_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(Rect(x1, y_card + card_h - 22, card_w, 22, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(x1 + 10, y_card + card_h - 14, "PILLAR 1: LOCAL WORKSPACE", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK))
+    g.add(String(x1 + card_w - 10, y_card + card_h - 14, "Git CLI (Offline)", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_CHARCOAL, textAnchor="end"))
+
+    g.add(String(x1 + 10, y_card + card_h - 34, "Scope: Single-Machine Offline Architecture", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_DARK_GREY))
+    g.add(Line(x1 + 10, y_card + card_h - 38, x1 + card_w - 10, y_card + card_h - 38, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+
+    bullets1 = [
+        ("Snapshot checkpoints", "git commit -m (DAG nodes)"),
+        ("Multi-state staging index", "git add (proposed cache)"),
+        ("Branch context isolation", "git switch / switch -c"),
+        ("Graph temporal rewinds", "git reset / git restore"),
+    ]
+    for idx, (label, cmd) in enumerate(bullets1):
+        by = y_card + card_h - 50 - idx * 12.5
+        g.add(Rect(x1 + 10, by - 1, 4, 4, fillColor=COLOR_BLACK, strokeColor=None))
+        g.add(String(x1 + 20, by, label, fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_CHARCOAL))
+        g.add(String(x1 + card_w - 10, by, cmd, fontName="Courier", fontSize=6.0, fillColor=COLOR_MUTED, textAnchor="end"))
+
+    x2 = TOTAL_WIDTH - 15.0 - card_w
+    g.add(Rect(x2, y_card, card_w, card_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(Rect(x2, y_card + card_h - 22, card_w, 22, fillColor=COLOR_CHARCOAL, strokeColor=None))
+    g.add(String(x2 + 10, y_card + card_h - 14, "PILLAR 2: DISTRIBUTED COLLABORATION", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_WHITE))
+    g.add(String(x2 + card_w - 10, y_card + card_h - 14, "GitHub Platform (Cloud)", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_WHITE, textAnchor="end"))
+
+    g.add(String(x2 + 10, y_card + card_h - 34, "Scope: Multi-Node Distributed Cloud Architecture", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_DARK_GREY))
+    g.add(Line(x2 + 10, y_card + card_h - 38, x2 + card_w - 10, y_card + card_h - 38, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+
+    bullets2 = [
+        ("Upstream tracking & remotes", "git push -u origin <branch>"),
+        ("Asynchronous packet sync", "git fetch / git pull"),
+        ("Code review & pull requests", "PR approvals & CI gatekeepers"),
+        ("Team divergence resolution", "git merge / git rebase"),
+    ]
+    for idx, (label, cmd) in enumerate(bullets2):
+        by = y_card + card_h - 50 - idx * 12.5
+        g.add(Rect(x2 + 10, by - 1, 4, 4, fillColor=COLOR_CHARCOAL, strokeColor=None))
+        g.add(String(x2 + 20, by, label, fontName="Helvetica-Bold", fontSize=6.5, fillColor=COLOR_CHARCOAL))
+        g.add(String(x2 + card_w - 10, by, cmd, fontName="Courier", fontSize=6.0, fillColor=COLOR_MUTED, textAnchor="end"))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            8.0,
+            "PEDAGOGICAL RULE: Master Pillar 1 (Local State Machine) completely before tackling Pillar 2 (Remote Divergence).",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_config_cascade_diagram() -> Drawing:
+    """Git Configuration Precedence Cascade: Local > Global > System."""
+    height = 115.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 3.1: Git Configuration Precedence Cascade",
+        "Precedence Hierarchy: Local (.git/config) > Global (~/.gitconfig) > System (/etc/gitconfig)",
+    )
+
+    tiers = [
+        ("SYSTEM LEVEL", "--system", "/etc/gitconfig", "All OS Users & Repos", COLOR_BG_BOX, COLOR_MUTED),
+        ("GLOBAL LEVEL", "--global", "~/.gitconfig", "Current User (All Repos)", COLOR_BG_BOX, COLOR_CHARCOAL),
+        ("LOCAL LEVEL", "--local (Default)", ".git/config", "Active Single Repo", COLOR_BG_SHADED, COLOR_BLACK),
+        ("WORKTREE LEVEL", "--worktree", ".git/config.worktree", "Linked Worktree", COLOR_BG_BOX, COLOR_MUTED),
+    ]
+
+    tier_w = 95.0
+    tier_h = 58.0
+    gap = 14.0
+    start_x = 22.0
+    y_box = 28.0
+
+    for idx, (title, flag, path, scope, fill, text_col) in enumerate(tiers):
+        x = start_x + idx * (tier_w + gap)
+        border_w = 1.2 if idx == 2 else 0.75
+        border_col = COLOR_BLACK if idx == 2 else COLOR_DARK_GREY
+        g.add(Rect(x, y_box, tier_w, tier_h, fillColor=fill, strokeColor=border_col, strokeWidth=border_w, rx=3, ry=3))
+        g.add(Rect(x, y_box + tier_h - 14, tier_w, 14, fillColor=COLOR_BG_SHADED if idx != 2 else COLOR_CHARCOAL, strokeColor=None))
+        header_fg = COLOR_WHITE if idx == 2 else COLOR_BLACK
+        g.add(String(x + tier_w / 2.0, y_box + tier_h - 10, title, fontName="Helvetica-Bold", fontSize=6.5, fillColor=header_fg, textAnchor="middle"))
+        g.add(String(x + tier_w / 2.0, y_box + 30, flag, fontName="Courier-Bold", fontSize=6.5, fillColor=text_col, textAnchor="middle"))
+        g.add(String(x + tier_w / 2.0, y_box + 19, path, fontName="Courier", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+        g.add(String(x + tier_w / 2.0, y_box + 8, scope, fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+
+        if idx < len(tiers) - 1:
+            arrow_x = x + tier_w
+            _draw_arrow(g, arrow_x + 2, y_box + tier_h / 2.0, arrow_x + gap - 2, y_box + tier_h / 2.0, color=COLOR_BLACK, stroke_width=1.0)
+            g.add(String(arrow_x + gap / 2.0, y_box + tier_h / 2.0 + 4, "wins", fontName="Helvetica-Oblique", fontSize=5.0, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            10.0,
+            "CASCADE RULE: More specific configuration strictly overrides general configuration. Local repository always wins.",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_file_lifecycle_diagram() -> Drawing:
+    """Git File Lifecycle State Machine: Untracked -> Staged -> Committed -> Modified."""
+    height = 150.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 4.2: Git File Lifecycle State Machine",
+        "Untracked, Staged (Index), Committed (Clean), and Modified (Dirty) Transitions",
+    )
+
+    node_w = 95.0
+    node_h = 42.0
+
+    x_untracked = 15.0
+    y_top = 70.0
+    g.add(Rect(x_untracked, y_top, node_w, node_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_untracked + node_w / 2.0, y_top + 28, "UNTRACKED", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_untracked + node_w / 2.0, y_top + 16, "Badge '??' / 'U'", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+    g.add(String(x_untracked + node_w / 2.0, y_top + 6, "New file on disk only", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    x_staged = 190.0
+    g.add(Rect(x_staged, y_top, node_w, node_h, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.2, rx=3, ry=3))
+    g.add(String(x_staged + node_w / 2.0, y_top + 28, "STAGED (INDEX)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_staged + node_w / 2.0, y_top + 16, "Badge 'A ' / 'M '", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_staged + node_w / 2.0, y_top + 6, "Proposed commit snapshot", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+
+    x_committed = 365.0
+    g.add(Rect(x_committed, y_top, node_w, node_h, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_committed + node_w / 2.0, y_top + 28, "COMMITTED", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(x_committed + node_w / 2.0, y_top + 16, "Clean / Zero Diff", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(x_committed + node_w / 2.0, y_top + 6, "Permanent in DAG", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_HAIRLINE, textAnchor="middle"))
+
+    y_bot = 16.0
+    x_mod = 190.0
+    g.add(Rect(x_mod, y_bot, node_w, node_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_mod + node_w / 2.0, y_bot + 28, "MODIFIED (DIRTY)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_mod + node_w / 2.0, y_bot + 16, "Badge ' M' (Unstaged)", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+    g.add(String(x_mod + node_w / 2.0, y_bot + 6, "Edited on disk after commit", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    _draw_arrow(g, x_untracked + node_w, y_top + 22, x_staged, y_top + 22, color=COLOR_BLACK, stroke_width=1.0)
+    g.add(String((x_untracked + node_w + x_staged) / 2.0, y_top + 26, "git add", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    _draw_arrow(g, x_staged + node_w, y_top + 22, x_committed, y_top + 22, color=COLOR_BLACK, stroke_width=1.0)
+    g.add(String((x_staged + node_w + x_committed) / 2.0, y_top + 26, "git commit", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    g.add(Line(x_committed + node_w / 2.0, y_top, x_committed + node_w / 2.0, y_bot + node_h / 2.0, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8))
+    _draw_arrow(g, x_committed + node_w / 2.0, y_bot + node_h / 2.0, x_mod + node_w, y_bot + node_h / 2.0, color=COLOR_DARK_GREY, stroke_width=0.8)
+    g.add(String(x_committed + node_w / 2.0 + 4, (y_top + y_bot) / 2.0 + 10, "edit file", fontName="Helvetica-Oblique", fontSize=6.0, fillColor=COLOR_MUTED))
+
+    _draw_arrow(g, x_mod + 35, y_bot + node_h, x_mod + 35, y_top, color=COLOR_BLACK, stroke_width=1.0)
+    g.add(String(x_mod + 38, (y_bot + node_h + y_top) / 2.0, "git add", fontName="Courier-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    _draw_arrow(g, x_mod + 75, y_top, x_mod + 75, y_bot + node_h, color=COLOR_MUTED, stroke_width=0.8)
+    g.add(String(x_mod + 78, (y_bot + node_h + y_top) / 2.0, "restore --staged", fontName="Courier", fontSize=5.0, fillColor=COLOR_MUTED))
+
+    return d
+
+
+def create_git_objects_table_diagram() -> Drawing:
+    """The Four Fundamental Git Objects: blob, tree, commit, tag."""
+    height = 135.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 5.2: The Four Fundamental Git Objects",
+        "Immutable Content-Addressable Storage Architecture (.git/objects/)",
+    )
+
+    y_header = 92.0
+    row_h = 20.0
+
+    g.add(Rect(15, y_header, 445, 18, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=0.75))
+    g.add(String(25, y_header + 5, "OBJECT TYPE", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+    g.add(String(95, y_header + 5, "INTERNAL PAYLOAD STRUCTURE", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+    g.add(String(285, y_header + 5, "METADATA & ATTRIBUTES STORED", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+
+    rows = [
+        ("blob", "Raw zlib-compressed file byte stream", "Zero! No filename, no permissions, no timestamp."),
+        ("tree", "Directory entries: <mode> <type> <sha-1> <name>", "Preserves directory hierarchy, permissions, names."),
+        ("commit", "Root Tree SHA, Parent SHA(s), Author, Committer, Msg", "Permanent immutable snapshot node in DAG history."),
+        ("tag", "Target Commit SHA, Type, Tagger Name/Email, Timestamp", "Explicit release milestone pointer (e.g. v1.0.0)."),
+    ]
+
+    for idx, (obj_type, payload, meta) in enumerate(rows):
+        y = y_header - (idx + 1) * row_h
+        bg = COLOR_BG_BOX if idx % 2 == 0 else COLOR_BG_LIGHT
+        g.add(Rect(15, y, 445, row_h, fillColor=bg, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+
+        g.add(Rect(22, y + 3, 45, 14, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_DARK_GREY, strokeWidth=0.5, rx=2, ry=2))
+        g.add(String(44.5, y + 7, obj_type, fontName="Courier-Bold", fontSize=7.0, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+        g.add(String(95, y + 7, payload, fontName="Courier", fontSize=6.0, fillColor=COLOR_CHARCOAL))
+        g.add(String(285, y + 7, meta, fontName="Helvetica", fontSize=6.0, fillColor=COLOR_DARK_GREY))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            8.0,
+            "INVARIANT: All objects are cryptographically indexed by SHA-1 hash: '<type> <size>\\0<payload>'.",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_status_decode_matrix_diagram() -> Drawing:
+    """Two-Column Git Status Decoding Matrix (git status -s)."""
+    height = 185.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 7.2: Two-Column Git Status Decoding Matrix",
+        "Short Format (git status -s): Position 1 (Index vs HEAD) | Position 2 (Working Tree vs Index)",
+    )
+
+    y_header = 142.0
+    row_h = 16.0
+
+    g.add(Rect(15, y_header, 445, 18, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=0.75))
+    g.add(String(25, y_header + 5, "FLAG", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+    g.add(String(75, y_header + 5, "POS 1: INDEX vs HEAD (STAGED)", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+    g.add(String(260, y_header + 5, "POS 2: WORKING TREE vs INDEX (UNSTAGED)", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+
+    matrix_rows = [
+        ("??", "[Space] File not in Index", "Untracked new file on physical disk"),
+        ("A ", "New file staged in Index", "Clean (matches Index snapshot)"),
+        (" M", "Clean in Index (matches HEAD)", "Modified on disk (unstaged changes)"),
+        ("AM", "New file staged in Index", "Modified AGAIN on disk after staging!"),
+        ("M ", "File modification staged in Index", "Clean (matches Index snapshot)"),
+        ("MM", "File modification staged in Index", "Modified AGAIN on disk after staging!"),
+        ("D ", "File deletion staged in Index", "Clean in working tree (deleted on disk)"),
+        ("UU", "Unmerged path (Conflict in Index!)", "Unmerged path (Conflict in Working Tree!)"),
+    ]
+
+    for idx, (flag, col1, col2) in enumerate(matrix_rows):
+        y = y_header - (idx + 1) * row_h
+        bg = COLOR_BG_BOX if idx % 2 == 0 else COLOR_BG_LIGHT
+        g.add(Rect(15, y, 445, row_h, fillColor=bg, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+
+        flag_bg = COLOR_CHARCOAL if flag == "UU" else COLOR_BG_SHADED
+        flag_fg = COLOR_WHITE if flag == "UU" else COLOR_BLACK
+        g.add(Rect(22, y + 2, 28, 12, fillColor=flag_bg, strokeColor=COLOR_DARK_GREY, strokeWidth=0.5, rx=2, ry=2))
+        g.add(String(36, y + 5, flag, fontName="Courier-Bold", fontSize=6.5, fillColor=flag_fg, textAnchor="middle"))
+
+        g.add(String(75, y + 5, col1, fontName="Helvetica-Bold" if "staged" in col1.lower() else "Helvetica", fontSize=6.5, fillColor=COLOR_CHARCOAL))
+        
+        warn_col = COLOR_BLACK if "AGAIN" in col2 or "Conflict" in col2 else COLOR_DARK_GREY
+        g.add(String(260, y + 5, col2, fontName="Helvetica-Bold" if "AGAIN" in col2 or "Conflict" in col2 else "Helvetica", fontSize=6.5, fillColor=warn_col))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            8.0,
+            "CRITICAL GOTCHA: 'AM' / 'MM' indicates staged edits will be committed, but subsequent disk edits remain unstaged.",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_three_tree_pipeline_diagram() -> Drawing:
+    """Three-Tree Data Flow Pipeline: Working Directory -> Staging Index -> HEAD Repository."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 7.3: Three-Tree Transition & Command Pipeline",
+        "Data Flow Across Working Directory, Staging Index, and HEAD Repository",
+    )
+
+    col_w = 125.0
+    col_h = 70.0
+    y_col = 32.0
+
+    x1 = 15.0
+    g.add(Rect(x1, y_col, col_w, col_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x1 + col_w / 2.0, y_col + col_h - 14, "WORKING DIRECTORY", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x1 + col_w / 2.0, y_col + col_h - 26, "(Physical Disk Files)", fontName="Helvetica-Oblique", fontSize=6.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+    g.add(Line(x1, y_col + col_h - 30, x1 + col_w, y_col + col_h - 30, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(x1 + col_w / 2.0, y_col + 24, "Real OS File System", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+    g.add(String(x1 + col_w / 2.0, y_col + 12, "Unstaged & Dirty Edits", fontName="Courier", fontSize=6.0, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+
+    x2 = 175.0
+    g.add(Rect(x2, y_col, col_w, col_h, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.2, rx=3, ry=3))
+    g.add(String(x2 + col_w / 2.0, y_col + col_h - 14, "STAGING INDEX", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x2 + col_w / 2.0, y_col + col_h - 26, "(.git/index Binary Cache)", fontName="Helvetica-Oblique", fontSize=6.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+    g.add(Line(x2, y_col + col_h - 30, x2 + col_w, y_col + col_h - 30, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+    g.add(String(x2 + col_w / 2.0, y_col + 24, "Prepared Commit Snapshot", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+    g.add(String(x2 + col_w / 2.0, y_col + 12, "SHA-1 / Stat Cache", fontName="Courier", fontSize=6.0, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+
+    x3 = 335.0
+    g.add(Rect(x3, y_col, col_w, col_h, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x3 + col_w / 2.0, y_col + col_h - 14, "HEAD REPOSITORY", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(x3 + col_w / 2.0, y_col + col_h - 26, "(.git/objects/ Immutable DAG)", fontName="Helvetica-Oblique", fontSize=6.5, fillColor=COLOR_HAIRLINE, textAnchor="middle"))
+    g.add(Line(x3, y_col + col_h - 30, x3 + col_w, y_col + col_h - 30, strokeColor=COLOR_DARK_GREY, strokeWidth=0.5))
+    g.add(String(x3 + col_w / 2.0, y_col + 24, "Permanent Commit Objects", fontName="Helvetica", fontSize=6.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(x3 + col_w / 2.0, y_col + 12, "Branch Pointer Targets", fontName="Courier", fontSize=6.0, fillColor=COLOR_HAIRLINE, textAnchor="middle"))
+
+    _draw_arrow(g, x1 + col_w, y_col + 50, x2, y_col + 50, color=COLOR_BLACK, stroke_width=1.0)
+    g.add(String((x1 + col_w + x2) / 2.0, y_col + 55, "git add", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    _draw_arrow(g, x2 + col_w, y_col + 50, x3, y_col + 50, color=COLOR_BLACK, stroke_width=1.0)
+    g.add(String((x2 + col_w + x3) / 2.0, y_col + 55, "git commit", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    _draw_arrow(g, x3, y_col + 32, x2 + col_w, y_col + 32, color=COLOR_CHARCOAL, stroke_width=0.8)
+    g.add(String((x2 + col_w + x3) / 2.0, y_col + 23, "restore --staged", fontName="Courier", fontSize=5.5, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+
+    _draw_arrow(g, x2, y_col + 32, x1 + col_w, y_col + 32, color=COLOR_CHARCOAL, stroke_width=0.8)
+    g.add(String((x1 + col_w + x2) / 2.0, y_col + 23, "restore <file>", fontName="Courier", fontSize=5.5, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            10.0,
+            "DESTRUCTIVE OVERRIDE: 'git reset --hard' overwrites both Staging Index and Working Directory to match HEAD.",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_commit_dag_topology_diagram() -> Drawing:
+    """Directed Acyclic Graph (DAG) commit topology with backward parent pointers."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 8.1: Commit Directed Acyclic Graph (DAG) Topology",
+        "Child Commits Reference Immutable Parent SHAs (Time Flows Past ← Present)",
+    )
+
+    y_main = 85.0
+    y_branch = 38.0
+
+    main_commits = [("C0", 35.0, "(Root)"), ("C1", 115.0, "init"), ("C2", 195.0, "LCA"), ("C3", 285.0, "feat")]
+    for name, x, tag in main_commits:
+        g.add(Rect(x, y_main - 12, 42, 24, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=2, ry=2))
+        g.add(String(x + 21, y_main - 2, name, fontName="Helvetica-Bold", fontSize=8.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+        g.add(String(x + 21, y_main + 16, tag, fontName="Courier-Oblique", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    _draw_arrow(g, 115, y_main, 77, y_main, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, 195, y_main, 157, y_main, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, 285, y_main, 237, y_main, color=COLOR_BLACK, stroke_width=1.0)
+
+    g.add(Rect(345, y_main - 11, 48, 22, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(369, y_main - 3, "main", fontName="Courier-Bold", fontSize=7.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    _draw_arrow(g, 345, y_main, 327, y_main, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    g.add(Rect(410, y_main - 11, 48, 22, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=2, ry=2))
+    g.add(String(434, y_main - 3, "HEAD", fontName="Courier-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    _draw_arrow(g, 410, y_main, 393, y_main, color=COLOR_BLACK, stroke_width=0.8)
+
+    branch_commits = [("C4", 255.0, "nav-ui"), ("C5", 340.0, "nav-css")]
+    for name, x, tag in branch_commits:
+        g.add(Rect(x, y_branch - 12, 42, 24, fillColor=COLOR_BG_BOX, strokeColor=COLOR_DARK_GREY, strokeWidth=1.0, rx=2, ry=2))
+        g.add(String(x + 21, y_branch - 2, name, fontName="Helvetica-Bold", fontSize=8.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+        g.add(String(x + 21, y_branch + 16, tag, fontName="Courier-Oblique", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    _draw_arrow(g, 340, y_branch, 297, y_branch, color=COLOR_CHARCOAL, stroke_width=1.0)
+    _draw_arrow(g, 255, y_branch + 4, 225, y_main - 12, color=COLOR_CHARCOAL, stroke_width=1.0)
+
+    g.add(Rect(398, y_branch - 11, 68, 22, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(432, y_branch - 3, "feature/navbar", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+    _draw_arrow(g, 398, y_branch, 382, y_branch, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            10.0,
+            "INVARIANT: Edges point backward in time (Child → Parent). Branches are lightweight pointers, not containers.",
+            fontName="Helvetica-Bold",
+            fontSize=6.5,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_production_branching_diagram() -> Drawing:
+    """Production Feature Branch Isolation Architecture (abcd.com)."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 8.3: Production Branch Isolation Architecture",
+        "Production abcd.com Baseline vs Feature Navbar (Shivam) & Feature Footer (Ruchi)",
+    )
+
+    prod_w = 200.0
+    prod_h = 42.0
+    prod_x = (TOTAL_WIDTH - prod_w) / 2.0
+    prod_y = 74.0
+    g.add(Rect(prod_x, prod_y, prod_w, prod_h, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=1.2, rx=3, ry=3))
+    g.add(String(TOTAL_WIDTH / 2.0, prod_y + 28, "Production: abcd.com (32 lines)", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, prod_y + 16, "Stable main branch (Zero Crash Tolerance)", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, prod_y + 6, "Single Source of Truth for Live Deployment", fontName="Helvetica-Oblique", fontSize=5.5, fillColor=COLOR_HAIRLINE, textAnchor="middle"))
+
+    side_w = 205.0
+    side_h = 46.0
+    x_left = 18.0
+    y_bot = 16.0
+    g.add(Rect(x_left, y_bot, side_w, side_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_left + side_w / 2.0, y_bot + 34, "Shivam: feature/navbar", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_left + side_w / 2.0, y_bot + 22, "Diverges from Line 32 • Writes 100 new lines (132 total)", fontName="Helvetica", fontSize=6.0, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+    g.add(String(x_left + side_w / 2.0, y_bot + 10, "CONTAINS EXPERIMENTAL BUGS! Isolated safely.", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+
+    x_right = TOTAL_WIDTH - 18.0 - side_w
+    g.add(Rect(x_right, y_bot, side_w, side_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_right + side_w / 2.0, y_bot + 34, "Ruchi: feature/footer", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_right + side_w / 2.0, y_bot + 22, "Diverges from Line 32 • Writes 200 new lines (232 total)", fontName="Helvetica", fontSize=6.0, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+    g.add(String(x_right + side_w / 2.0, y_bot + 10, "CLEAN TESTED CODE • Ready for PR gatekeeper review.", fontName="Courier-Bold", fontSize=5.5, fillColor=COLOR_CHARCOAL, textAnchor="middle"))
+
+    _draw_arrow(g, prod_x + 35, prod_y, x_left + side_w * 0.7, y_bot + side_h, color=COLOR_CHARCOAL, stroke_width=1.0)
+    _draw_arrow(g, prod_x + prod_w - 35, prod_y, x_right + side_w * 0.3, y_bot + side_h, color=COLOR_CHARCOAL, stroke_width=1.0)
+
+    g.add(String(prod_x + 20, prod_y - 10, "git switch -c feature/navbar", fontName="Courier", fontSize=5.5, fillColor=COLOR_MUTED))
+    g.add(String(prod_x + prod_w - 20, prod_y - 10, "git switch -c feature/footer", fontName="Courier", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="end"))
+
+    return d
+
+
+def create_detached_head_hazard_diagram() -> Drawing:
+    """Detached HEAD State and Orphan Commit Garbage Collection Hazard."""
+    height = 145.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 8.4: Detached HEAD State & The Orphan Commit Hazard",
+        "HEAD points directly to Commit SHA instead of a Branch Reference Pointer",
+    )
+
+    y_main = 85.0
+    y_orphan = 35.0
+
+    commits_main = [("C0", 35.0), ("C1", 115.0), ("C2", 195.0)]
+    for name, x in commits_main:
+        g.add(Rect(x, y_main - 12, 42, 24, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=2, ry=2))
+        g.add(String(x + 21, y_main - 2, name, fontName="Helvetica-Bold", fontSize=8.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    _draw_arrow(g, 115, y_main, 77, y_main, color=COLOR_BLACK, stroke_width=1.0)
+    _draw_arrow(g, 195, y_main, 157, y_main, color=COLOR_BLACK, stroke_width=1.0)
+
+    g.add(Rect(245, y_main - 11, 45, 22, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=2, ry=2))
+    g.add(String(267.5, y_main - 3, "main", fontName="Courier-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    _draw_arrow(g, 245, y_main, 237, y_main, color=COLOR_BLACK, stroke_width=0.8)
+
+    g.add(Rect(260, y_orphan - 16, 195, 38, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8, strokeDashArray=[2, 2], rx=3, ry=3))
+    g.add(String(357.5, y_orphan + 14, "UNREFERENCED ORPHAN COMMITS", fontName="Helvetica-Bold", fontSize=6.0, fillColor=COLOR_DARK_GREY, textAnchor="middle"))
+
+    g.add(Rect(275, y_orphan - 10, 38, 20, fillColor=COLOR_BG_BOX, strokeColor=COLOR_DARK_GREY, strokeWidth=0.8, rx=2, ry=2))
+    g.add(String(294, y_orphan - 2, "C3", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    g.add(Rect(345, y_orphan - 10, 38, 20, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.2, rx=2, ry=2))
+    g.add(String(364, y_orphan - 2, "C4", fontName="Helvetica-Bold", fontSize=7.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+
+    _draw_arrow(g, 345, y_orphan, 313, y_orphan, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, 275, y_orphan + 5, 225, y_main - 12, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    g.add(Rect(405, y_orphan - 10, 42, 20, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=2, ry=2))
+    g.add(String(426, y_orphan - 2, "HEAD", fontName="Courier-Bold", fontSize=7.0, fillColor=COLOR_WHITE, textAnchor="middle"))
+    _draw_arrow(g, 405, y_orphan, 383, y_orphan, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            8.0,
+            "HAZARD: Switching away from detached HEAD leaves C3/C4 unreferenced; git gc will purge them! Rescue: 'git switch -c rescue'.",
+            fontName="Helvetica-Bold",
+            fontSize=6.0,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_commands_matrix_diagram() -> Drawing:
+    """Master Production Diagnostic Commands Matrix."""
+    height = 215.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 15.2: Master Diagnostic Commands Matrix",
+        "Essential Production CLI Diagnostics for Staging, Inspection, Graphing & Recovery",
+    )
+
+    y_header = 178.0
+    row_h = 12.5
+
+    g.add(Rect(15, y_header, 445, 14, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=0.75))
+    g.add(String(25, y_header + 4, "OBJECTIVE / DIAGNOSTIC TASK", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+    g.add(String(245, y_header + 4, "PRODUCTION COMMAND", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_WHITE))
+
+    commands = [
+        ("Inspect binary index staging cache", "git ls-files -s"),
+        ("Resolve human ref to 40-char SHA", "git rev-parse HEAD"),
+        ("View HEAD symbolic target branch", "git symbolic-ref HEAD"),
+        ("Trace full local pointer movements", "git reflog show HEAD"),
+        ("Audit unreferenced dangling objects", "git fsck --lost-found"),
+        ("Find Lowest Common Ancestor (LCA)", "git merge-base branchA branchB"),
+        ("Diff working tree against staging", "git diff"),
+        ("Diff staging against HEAD commit", "git diff --staged"),
+        ("Check for unresolved conflict markers", "git diff --check"),
+        ("Safe force push verification", "git push --force-with-lease"),
+        ("Rebase interactive clean up", "git rebase -i HEAD~N"),
+        ("Abort failed merge operation", "git merge --abort"),
+        ("Abort failed rebase operation", "git rebase --abort"),
+    ]
+
+    for idx, (objective, cmd) in enumerate(commands):
+        y = y_header - (idx + 1) * row_h
+        bg = COLOR_BG_BOX if idx % 2 == 0 else COLOR_BG_LIGHT
+        g.add(Rect(15, y, 445, row_h, fillColor=bg, strokeColor=COLOR_HAIRLINE, strokeWidth=0.5))
+        g.add(String(25, y + 3.0, objective, fontName="Helvetica", fontSize=6.0, fillColor=COLOR_CHARCOAL))
+        g.add(String(245, y + 3.0, cmd, fontName="Courier-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    g.add(
+        String(
+            TOTAL_WIDTH / 2.0,
+            5.0,
+            "REFERENCE: Memorize these diagnostic commands for senior system audits and high-stakes production recovery.",
+            fontName="Helvetica-Bold",
+            fontSize=6.0,
+            fillColor=COLOR_BLACK,
+            textAnchor="middle",
+        )
+    )
+
+    return d
+
+
+def create_conflict_decision_tree_diagram() -> Drawing:
+    """Merge Conflict Emergency Decision Tree: Source Code vs Dependency Lockfiles."""
+    height = 175.0
+    d, g = _make_canvas_frame(
+        height,
+        "Figure 15.3: Merge Conflict Emergency Decision Tree",
+        "Deterministic Resolution Workflow for Source Code and Dependency Lockfiles",
+    )
+
+    top_w = 230.0
+    top_h = 36.0
+    top_x = (TOTAL_WIDTH - top_w) / 2.0
+    top_y = 104.0
+    g.add(Rect(top_x, top_y, top_w, top_h, fillColor=COLOR_CHARCOAL, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(TOTAL_WIDTH / 2.0, top_y + 24, "MERGE CONFLICT TRIGGERED", fontName="Helvetica-Bold", fontSize=8.0, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, top_y + 13, "Inspect: git status -s (look for 'UU')", fontName="Courier", fontSize=6.5, fillColor=COLOR_WHITE, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, top_y + 4, "Config: git config merge.conflictstyle diff3", fontName="Courier-Oblique", fontSize=5.5, fillColor=COLOR_HAIRLINE, textAnchor="middle"))
+
+    card_w = 205.0
+    card_h = 48.0
+    x_left = 18.0
+    y_card = 46.0
+    g.add(Rect(x_left, y_card, card_w, card_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_left + card_w / 2.0, y_card + 36, "CODE FILE (.js, .py, .html, .ts)", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_left + 10, y_card + 25, "1. Open in VS Code 3-Way Merge Resolver", fontName="Helvetica", fontSize=6.0, fillColor=COLOR_CHARCOAL))
+    g.add(String(x_left + 10, y_card + 15, "2. Compare: Ours vs Ancestor Base vs Theirs", fontName="Helvetica", fontSize=6.0, fillColor=COLOR_CHARCOAL))
+    g.add(String(x_left + 10, y_card + 5, "3. Stage resolved file: git add <file>", fontName="Courier-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+
+    x_right = TOTAL_WIDTH - 18.0 - card_w
+    g.add(Rect(x_right, y_card, card_w, card_h, fillColor=COLOR_BG_BOX, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(x_right + card_w / 2.0, y_card + 36, "DEPENDENCY LOCKFILE (package-lock, etc.)", fontName="Helvetica-Bold", fontSize=7.0, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(x_right + 10, y_card + 25, "1. NEVER edit auto-generated lockfiles manually!", fontName="Helvetica-Bold", fontSize=6.0, fillColor=COLOR_CHARCOAL))
+    g.add(String(x_right + 10, y_card + 15, "2. git checkout --theirs <lockfile>", fontName="Courier-Bold", fontSize=6.0, fillColor=COLOR_BLACK))
+    g.add(String(x_right + 10, y_card + 5, "3. Regenerate & verify: npm install / cargo check", fontName="Courier", fontSize=6.0, fillColor=COLOR_CHARCOAL))
+
+    bot_w = 240.0
+    bot_h = 24.0
+    bot_x = (TOTAL_WIDTH - bot_w) / 2.0
+    bot_y = 12.0
+    g.add(Rect(bot_x, bot_y, bot_w, bot_h, fillColor=COLOR_BG_SHADED, strokeColor=COLOR_BLACK, strokeWidth=1.0, rx=3, ry=3))
+    g.add(String(TOTAL_WIDTH / 2.0, bot_y + 14, "Finalize: git commit -m \"merge: resolve integration\"", fontName="Courier-Bold", fontSize=6.5, fillColor=COLOR_BLACK, textAnchor="middle"))
+    g.add(String(TOTAL_WIDTH / 2.0, bot_y + 4, "Emergency Escape / Abort: git merge --abort", fontName="Courier", fontSize=5.5, fillColor=COLOR_MUTED, textAnchor="middle"))
+
+    _draw_arrow(g, top_x + 30, top_y, x_left + card_w / 2.0, y_card + card_h, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, top_x + top_w - 30, top_y, x_right + card_w / 2.0, y_card + card_h, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, x_left + card_w / 2.0, y_card, bot_x + 30, bot_y + bot_h, color=COLOR_CHARCOAL, stroke_width=0.8)
+    _draw_arrow(g, x_right + card_w / 2.0, y_card, bot_x + bot_w - 30, bot_y + bot_h, color=COLOR_CHARCOAL, stroke_width=0.8)
+
+    return d
+
+
 DIAGRAM_REGISTRY = {
+    "central_codebase": create_central_codebase_diagram,
+    "cvcs_vs_dvcs": create_cvcs_vs_dvcs_diagram,
+    "github_ssot_hub": create_github_ssot_hub_diagram,
+    "two_pillars": create_two_pillars_diagram,
+    "config_cascade": create_config_cascade_diagram,
+    "file_lifecycle": create_file_lifecycle_diagram,
+    "git_objects_table": create_git_objects_table_diagram,
+    "status_decode_matrix": create_status_decode_matrix_diagram,
+    "three_tree_pipeline": create_three_tree_pipeline_diagram,
+    "commit_dag_topology": create_commit_dag_topology_diagram,
+    "production_branching": create_production_branching_diagram,
+    "detached_head_hazard": create_detached_head_hazard_diagram,
+    "commands_matrix": create_commands_matrix_diagram,
+    "conflict_decision_tree": create_conflict_decision_tree_diagram,
+    "fork_upstream_workflow": create_fork_upstream_diagram,
+    "git_vs_github": create_git_vs_github_diagram,
+    "dot_git_internals": create_dot_git_internals_diagram,
+    "trunk_vs_gitflow": create_trunk_vs_gitflow_diagram,
+    "status_matrix": create_status_matrix_diagram,
+    "collaboration_steps": create_collaboration_steps_diagram,
     "object_model": create_object_model_diagram,
     "three_trees": create_three_trees_diagram,
     "branching_dag": create_branching_dag_diagram,

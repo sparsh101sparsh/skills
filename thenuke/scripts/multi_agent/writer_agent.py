@@ -98,7 +98,7 @@ class WriterAgent:
         lines.append(f"# {topic.upper()}: The Complete Reference Manual")
         lines.append(f"## {syllabus.edition_title}")
         lines.append("")
-        lines.append("Prepared by @issparsh @sumitsingh097")
+        lines.append(getattr(self, "branding", "Prepared by @issparsh"))
         lines.append("")
         lines.append("=" * 80)
         lines.append("")

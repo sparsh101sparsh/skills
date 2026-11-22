@@ -243,9 +243,9 @@ def resolve_file(filepath: Path) -> bool:
         ours_block = match.group(1)
         theirs_block = match.group(2)
 
-        print(f"\\n--- Conflict #{i} ---")
-        print(f"[Ours]:\\n{ours_block}")
-        print(f"[Theirs]:\\n{theirs_block}")
+        print(f"\n[Conflict #{i}]")
+        print(f"[Ours]:\n{ours_block}")
+        print(f"[Theirs]:\n{theirs_block}")
 
         choice = input("Select: [1] Keep Ours  [2] Keep Theirs  [3] Keep Both: ").strip()
         if choice == "1":

@@ -31,9 +31,14 @@ from .cp_problem import (
     CPSample,
     detect_cp_platform,
     extract_atcoder_problem,
+    extract_codechef_problem,
     extract_codeforces_problem,
     extract_cp_problem,
+    extract_geeksforgeeks_problem,
+    extract_hackerrank_problem,
+    extract_interviewbit_problem,
     extract_leetcode_problem,
+    fetch_via_oj_api,
     ingest_cp_problem,
     is_cp_url,
 )
@@ -67,8 +72,8 @@ logger = logging.getLogger(__name__)
 def run_ingestion(
     sources: List[str],
     output_corpus_path: Optional[str | Path] = "nuke_ingestion_corpus.json",
-    assets_dir: Optional[str | Path] = "assets",
-    download_video: bool = True,
+    assets_dir: Optional[str | Path] = None,
+    download_video: bool = False,
     ocr_mode: bool = False,
 ) -> UnifiedCorpus:
     """Unified ingestion pipeline runner.
@@ -78,7 +83,10 @@ def run_ingestion(
     its specialized ingestion engine, and compiles into a UnifiedCorpus.
     """
     corpus = UnifiedCorpus()
-    assets_path = Path(assets_dir) if assets_dir else Path("assets")
+    if assets_dir is not None:
+        assets_path = Path(assets_dir)
+    else:
+        assets_path = Path.home() / "thenuke_workspace" / "scratch" / "assets"
     assets_path.mkdir(parents=True, exist_ok=True)
 
     for src_str in sources:
@@ -183,9 +191,14 @@ __all__ = [
     "CPSample",
     "is_cp_url",
     "detect_cp_platform",
+    "fetch_via_oj_api",
     "extract_cp_problem",
     "extract_codeforces_problem",
     "extract_leetcode_problem",
     "extract_atcoder_problem",
+    "extract_codechef_problem",
+    "extract_hackerrank_problem",
+    "extract_geeksforgeeks_problem",
+    "extract_interviewbit_problem",
     "ingest_cp_problem",
 ]

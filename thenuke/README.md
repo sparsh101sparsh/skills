@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Antigravity](https://img.shields.io/badge/Antigravity-Verified%20Skill-8A2BE2.svg?style=for-the-badge)](https://github.com/sparsh101sparsh/skills)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Test Suite](https://img.shields.io/badge/Tests-453%20Passed%20(100%25)-00C853?style=for-the-badge)](#-test-architecture--verification)
+[![Test Suite](https://img.shields.io/badge/Tests-539%20Passed%20(100%25)-00C853?style=for-the-badge)](#-test-architecture--verification)
 [![Aesthetic](https://img.shields.io/badge/Aesthetic-Monochrome%20High--Contrast-000000?style=for-the-badge)](#-typographic-hierarchy--monochrome-palette)
 [![Script Invariant](https://img.shields.io/badge/Language-100%25%20Roman%20Hinglish-FF6F00?style=for-the-badge)](#-linguistic-system--strict-roman-hinglish)
 [![Author Attribution](https://img.shields.io/badge/Prepared%20By-%40issparsh%20%26%20%40sumitsingh097-1DA1F2?style=for-the-badge&logo=x&logoColor=white)](https://x.com/issparsh)
@@ -35,15 +35,16 @@
   - [4.6 Stage 6: Post-Clearance Automated Data Lifecycle](#46-stage-6-post-clearance-automated-data-lifecycle)
 - [5. Linguistic System & Strict Roman Hinglish](#-linguistic-system--strict-roman-hinglish)
 - [6. Typographic Hierarchy & Monochrome Palette](#-typographic-hierarchy--monochrome-palette)
-- [7. Cross-Platform Installation](#-cross-platform-installation)
-  - [7.1 Automated 1-Line Installation](#71-automated-1-line-installation-macos--linux)
-  - [7.2 Manual Installation (macOS / Linux / Windows WSL)](#72-manual-installation)
-  - [7.3 Antigravity Skill Registration](#73-antigravity-skill-registration)
-- [8. CLI Command Reference](#-cli-command-reference)
-- [9. Test Architecture & Verification](#-test-architecture--verification)
-- [10. Data Structures & File Schemas](#-data-structures--file-schemas)
-- [11. Authors & Attribution](#-authors--attribution)
-- [12. License](#-license)
+- [7. Mathematical Typesetting & Academic Notation Standards](#-mathematical-typesetting--academic-notation-standards-non-negotiable)
+- [8. Cross-Platform Installation](#-cross-platform-installation)
+  - [8.1 Automated 1-Line Installation](#81-automated-1-line-installation-macos--linux)
+  - [8.2 Manual Installation (macOS / Linux / Windows WSL)](#82-manual-installation)
+  - [8.3 Antigravity Skill Registration](#83-antigravity-skill-registration)
+- [9. CLI Command Reference](#-cli-command-reference)
+- [10. Test Architecture & Verification](#-test-architecture--verification)
+- [11. Data Structures & File Schemas](#-data-structures--file-schemas)
+- [12. Authors & Attribution](#-authors--attribution)
+- [13. License](#-license)
 
 ---
 
@@ -71,6 +72,8 @@ Modern technical documentation generation suffers from a fundamental impedance m
 | **Native Vector Technical Diagrams** | `scripts/diagramming/vector_diagrams.py` | Native ReportLab `Drawing` vector diagrams (Commit DAGs, 3-Trees, LCA merges, Rebase replays, Object pointer graphs) at 0 rasterization loss |
 | **ReportLab Publication Compiler** | `scripts/diagramming/reportlab_engine.py` | Professional ISO A4 layout with running hairline rules, vector 𝕏 branding, and strict page budgeting |
 | **Multi-Source Ingestion** | YouTube (720p), Web Documentation, GitHub, PDFs, PPTX, Local Video/Audio, Screenshots | Single unified corpus (`nuke_ingestion_corpus.json`) regardless of input format |
+| **CP Problem Ingestion** | `scripts/ingestion/cp_problem.py` | Dedicated parsers for Codeforces, LeetCode, AtCoder, CodeChef, and HackerRank via `online-judge-tools` and APIs; math preservation, sample I/O blocks |
+| **Universal LaTeX & Macro Extinguisher** | `scripts/diagramming/reportlab_engine.py` | Font-safe floor/ceil translations, universal LaTeX macro unpacker, full AMS-LaTeX/Greek coverage, zero-crash XML entity resilience |
 | **Strict 720p Video Pipeline** | `yt-dlp -f "bestvideo[height<=720]+bestaudio/best[height<=720]"` | Prevents 4K bandwidth saturation while retaining full text sharpness on 1080p slide recordings |
 | **Adaptive Video Frame Analysis (Dual-Mode)** | Ask User: AI Multimodal Visual Inspection vs. Programmatic OCR Pipeline (`--ocr-frames`) | Eliminates token exhaustion on 10h+ videos via OCR, while enabling high-fidelity visual analysis on short/medium talks |
 | **Dynamic Frame Sampling** | Scene-change detection heuristic based on duration: $R = \max(0.05, \min(0.5, \frac{180}{T}))$ | Captures blackboard writing, code diffs, and slide transitions without duplicate frame bloat |
@@ -185,6 +188,11 @@ The ingestion engine homogenizes heterogeneous data streams into a normalized `U
   - Ingests local `.pdf` documents via PyMuPDF vector extraction.
   - Extracts `.pptx` slides, notes, and shape groupings via `python-pptx`.
   - Ingests local `.mp4`, `.mov`, `.wav`, and `.mp3` media files with automatic transcription.
+- **`cp_problem.py`**:
+  - Dedicated competitive programming ingestion engine supporting Codeforces, LeetCode, AtCoder, CodeChef, and HackerRank.
+  - Integrates with `online-judge-tools` (`oj`, `oj-api`) for automated problem statement extraction and sample test case retrieval.
+  - Preserves mathematical formulas, KaTeX/LaTeX delimiters (`$`, `$$`, `$$$`), piecewise cases, and matrix environments intact.
+  - Formats sample inputs and outputs into dedicated, monospaced code blocks.
 
 ---
 
@@ -287,6 +295,8 @@ Pass 1: Visual & Structural QA (150 DPI Rasterization)
 
 Pass 2: Textual & Linguistic Quality Audit
   • Devanagari Unicode Regex : PASS (0 violations detected)
+  • Unrendered LaTeX Check   : PASS (0 macro escapes, 0 raw backslashes)
+  • Tofu & Replacement Check : PASS (0 black squares, 0 font tofu)
   • Syllabus Index Check     : PASS (PART I to VI verified)
   • Phase Challenges Check   : PASS (27 drills detected across 9 phases)
   • Author Branding Check    : PASS (@issparsh @sumitsingh097 verified)
@@ -374,19 +384,66 @@ Adheres to a minimalist, high-contrast monochrome aesthetic for focused reading:
 
 ---
 
-## 💻 Cross-Platform Installation
+## 📐 Mathematical Typesetting & Academic Notation Standards (Non-Negotiable)
 
-### 7.1 Automated 1-Line Installation (macOS / Linux)
+Whenever `thenuke` produces educational explanations, reference manuals, notes, competitive programming problem breakdowns, or PDF documents containing mathematical formulas, it strictly enforces **university-textbook academic typesetting**.
 
-Run this single command to clone the repository, install Python dependencies, and register the skill in your Antigravity environment:
+### 1. LaTeX Source Standard & Ban on Informal Approximations
+All mathematical formulas must use standard LaTeX (`\( ... \)` inline, `\[ ... \]` or `$$ ... $$` display).
+- ❌ **Strictly Banned:** Linear plain-text approximations such as `P(A|B) = P(A B) / P(B)`, `a/b`, `sum(i=1 to n) xi`, `sqrt(a+b)`, `integral f(x) dx`, `lim(x->0) f(x)`.
+- ✅ **Mandatory:** Formally typeset LaTeX with proper operators, vertical fraction bars, explicit conditions, and correct symbols:
+  $$P(A \mid B) = \frac{P(A \cap B)}{P(B)}, \qquad P(B) > 0$$
 
+### 2. The 12 Mathematical Formatting Rules (Rules A through L)
+
+| Rule | Topic | Linear Approximation (BANNED) | Academic Standard (MANDATORY) |
+|---|---|---|---|
+| **A** | **Fractions** | `a/b` | `\[ \frac{a}{b} \]` |
+| **B** | **Conditional Probability** | `P(A/B) = P(AB)/P(B)` | `\[ P(A \mid B) = \frac{P(A \cap B)}{P(B)}, \qquad P(B) > 0 \]` |
+| **C** | **Subscripts** | `x1, x2, aij` | `\(x_1,\quad x_2,\quad a_{ij}\)` |
+| **D** | **Superscripts & Powers** | `x^2, a^n` | `\[ x^2,\qquad a^n \]` |
+| **E** | **Roots & Radicals** | `sqrt(x), sqrt(a+b)` | `\[ \sqrt{x},\qquad \sqrt{a+b} \]` |
+| **F** | **Summations** | `sum(i=1 to n) xi` | `\[ \sum_{i=1}^{n} x_i \]` |
+| **G** | **Integrals** | `integral f(x) dx` | `\[ \int f(x)\,dx \]` |
+| **H** | **Limits** | `lim(x->0) f(x)` | `\[ \lim_{x \to 0} f(x) \]` |
+| **I** | **Matrices** | ASCII tables or linear rows | `\[ A = \begin{bmatrix} a_{11} & a_{12} \\ a_{21} & a_{22} \end{bmatrix} \]` |
+| **J** | **Sets & Logic** | `union, intersect, implies` | `\[ A \cup B,\quad A \cap B,\quad A \subseteq B,\quad A \Rightarrow B \]` |
+| **K** | **Greek Letters** | `alpha, beta, theta` | `\(\alpha,\quad \beta,\quad \theta,\quad \lambda,\quad \mu,\quad \sigma\)` |
+| **L** | **Multi-Step Derivations** | Unaligned multi-line text | `\[ \begin{aligned} x^2 - 5x + 6 &= 0 \\ (x-2)(x-3) &= 0 \\ x &= 2 \quad \text{or} \quad x = 3 \end{aligned} \]` |
+
+### 3. Inline vs Display Math Rules
+- **Inline (`\(...\)`):** Use for short expressions embedded in sentence prose (`The variable \(x\) represents the unknown, with \(x > 0\)`).
+- **Display (`\[...\]`):** Use for core definitions, theorems, vertical fractions, multi-step derivations, and formulas that students must memorize.
+
+### 4. Mathematical Correctness & Invariants
+- **Preserve Conditions:** Never omit conditions such as $P(B) > 0$. Division by zero is undefined.
+- **Distinguish Concepts:** Never conflate $P(A \mid B)$ with the ratio $\frac{P(A)}{P(B)}$.
+- **No Guesswork on Ambiguities:** Flag ambiguous expressions rather than guessing symbols.
+
+### 5. High-Resolution Visual Flowable Rendering Pipeline
+- Math expressions are dynamically rendered at 300 DPI into transparent vector-like flowables using `scripts/diagramming/math_renderer.py` and embedded into ReportLab documents.
+- Pass 2 of `scripts/qa/qa_audit_engine.py` validates that zero raw macro commands or informal approximations slip into the published PDF.
+
+### 6. CLI Command
 ```bash
-git clone https://github.com/sparsh101sparsh/thenuke.git ~/.gemini/config/skills/thenuke && cd ~/.gemini/config/skills/thenuke && pip install -r requirements.txt
+python thenuke_cli.py explain-math conditional-probability --output output/Conditional_Probability.pdf
 ```
 
 ---
 
-### 7.2 Manual Installation
+## 💻 Cross-Platform Installation
+
+### 8.1 Automated One-Line Install
+
+Run this single command to clone the repository, install Python dependencies, and register the skill in your Antigravity environment:
+
+```bash
+git clone https://github.com/sparsh101sparsh/thenuke.git ~/.gemini/config/skills/thenuke && cd ~/.gemini/config/skills/thenuke && pip install -e ".[cp,whisper,dev]"
+```
+
+---
+
+### 8.2 Manual Installation
 
 #### Step 1: Install System Binaries
 The video ingestion pipeline requires `ffmpeg` and `yt-dlp`.
@@ -411,22 +468,40 @@ cd thenuke
 ```
 
 #### Step 3: Install Python Dependencies
+
 ```bash
 # Python 3.10+ recommended
+# Standard editable install with core dependencies:
+pip install -e .
+
+# Or using requirements.txt:
 pip install -r requirements.txt
+
+# With optional extras:
+# For Competitive Programming ingestion (online-judge-tools + beautifulsoup4):
+pip install -e ".[cp]"
+
+# For local Whisper audio transcription (faster-whisper):
+pip install -e ".[whisper]"
+
+# For development and running the test suite (pytest):
+pip install -e ".[dev]"
+
+# Or install all features:
+pip install -e ".[cp,whisper,dev]"
 ```
 
-*(On macOS with system-managed Python, use `pip install --user --break-system-packages -r requirements.txt` or a dedicated virtual environment).*
+*(On macOS with system-managed Python, use `pip install --break-system-packages -e .` or a dedicated virtual environment).*
 
 ---
 
-### 7.3 Antigravity Skill Registration
+### 8.3 Antigravity Skill Registration
 
 To make `thenuke` globally accessible to your Google Antigravity pair-programming agent, copy it to the global configuration directory:
 
 ```bash
 mkdir -p ~/.gemini/config/skills/thenuke
-cp -r scripts tests thenuke_cli.py SKILL.md requirements.txt LICENSE ~/.gemini/config/skills/thenuke/
+cp -r scripts tests thenuke_cli.py pyproject.toml SKILL.md requirements.txt LICENSE ~/.gemini/config/skills/thenuke/
 ```
 
 Once installed, simply prompt your Antigravity agent:
@@ -465,14 +540,41 @@ python thenuke_cli.py run \
 | Flag | Type | Description |
 |---|---|---|
 | `sources` | `positional` | One or more URLs or local file paths |
+| `--download-video` | `boolean` | Download 720p video stream and extract frames (default: False, fast subtitles-only path) |
+| `--subtitles-only` | `boolean` | Fast path: ingest subtitles only (default) |
+| `--ocr-frames` | `boolean` | Run OCR on video frames instead of visual self-analysis |
 | `--non-interactive` | `boolean` | Skips terminal interview; applies preset configuration |
 | `--preset` | `string` | Grilling preset: `foundations`, `resource_parity`, `senior_architect_faang` |
 | `--skip-cleanup` | `boolean` | Bypasses confirmation prompt for intermediate file cleanup |
 
+#### `compile-git` — Canonical Git Reference Manual
+Compiles the authoritative, publication-grade *Git: Architecture & Internals* manual with vector DAGs, commit trees, LCA merges, and 9-phase curriculum.
+```bash
+python thenuke_cli.py compile-git --output ~/thenuke_workspace/output/Git_Reference_Manual.pdf
+```
+
+#### `ingest-notes` — Grounded Extractive Notes Synthesizer
+Ingests multi-modal resources, maps them into an explicit `CorpusIndexer` (`EvidenceSpan`) layer, and synthesizes publication-grade study notes directly grounded in the source corpus (transcripts, code snippets, key concepts) with zero canned template text.
+```bash
+python thenuke_cli.py ingest-notes "https://youtu.be/..." --topic "Modern Distributed Systems" --output ~/thenuke_workspace/output/Notes.pdf
+```
+
+#### `explain-math` — Academic Mathematical Typesetting & Manual Compiler
+Generates rigorous academic notes and explanations with 100% LaTeX notation (Rules A through L) and compiles them into a publication-grade PDF with 300 DPI rendered math flowables.
+```bash
+python thenuke_cli.py explain-math conditional-probability --output output/Conditional_Probability.pdf
+```
+
+#### `fetch-problem` — Competitive Programming Problem Fetcher
+Scrapes and parses competitive programming problem statements across Codeforces, LeetCode, AtCoder, CodeChef, HackerRank, GeeksforGeeks, and InterviewBit. Preserves exact sample indentation and LaTeX mathematics.
+```bash
+python thenuke_cli.py fetch-problem "https://codeforces.com/problemset/problem/1915/C"
+```
+
 #### `ingest` — Ingestion Only
 ```bash
 python thenuke_cli.py ingest "https://youtube.com/..." "/path/to/slides.pptx"
-# Serializes to ~/thenuke_workspace/nuke_ingestion_corpus.json
+# Serializes to ~/thenuke_workspace/nuke_ingestion_corpus.json (defaults to fast subtitles-only)
 ```
 
 #### `grill` — Scope Alignment Only
@@ -496,8 +598,8 @@ python thenuke_cli.py compile ~/thenuke_workspace/output/thenuke_manual_*.md \
 
 #### `qa` — Quality Audit Inspection
 ```bash
-python thenuke_cli.py qa ~/thenuke_workspace/output/thenuke_manual_*.pdf --strict
-# Produces ~/thenuke_workspace/output/qa_report.json (exits 1 on defects)
+python thenuke_cli.py qa ~/thenuke_workspace/output/thenuke_manual_*.pdf --profile auto --strict
+# Profiles: auto | git | js | cp | notes. Produces qa_report.json (exits 1 on defects).
 ```
 
 #### `clean` — Manual Data Wipe
@@ -510,17 +612,18 @@ python thenuke_cli.py clean --yes
 
 ## 🧪 Test Architecture & Verification
 
-`thenuke` enforces a 4-tier test architecture with **453 automated tests** passing at **100% success rate**:
+`thenuke` enforces a 4-tier test architecture with **539 automated tests** passing at **100% success rate**:
 
 ```bash
 # Execute entire test suite
 pytest tests/ -v
 
 # Target specific milestone suites
-pytest tests/test_ingestion.py tests/test_ingestion_user_specs.py
+pytest tests/test_ingestion.py tests/test_cp_ingestion.py tests/test_ingestion_user_specs.py
 pytest tests/test_grilling.py tests/test_challenger_m2_stress.py
 pytest tests/test_synthesis.py
-pytest tests/test_diagramming_and_qa.py
+pytest tests/test_diagramming_and_qa.py tests/test_rendering_invariants.py
+pytest tests/e2e/
 ```
 
 ### Test Coverage Matrix
@@ -530,14 +633,19 @@ pytest tests/test_diagramming_and_qa.py
 │ Test Module                   │ Count │ Status  │ Scope Verified                               │
 ├───────────────────────────────┼───────┼─────────┼──────────────────────────────────────────────┤
 │ test_ingestion.py             │ 35    │ PASSED  │ YouTube URLs, subtitle deduplication, DOM    │
-│ test_ingestion_user_specs.py  │ 15    │ PASSED  │ 720p format flags, dynamic frame rate, whisper│
-│ test_challenger_m1_*.py       │ 220   │ PASSED  │ Adversarial boundary fuzzing, VTT timing     │
-│ test_grilling.py              │ 31    │ PASSED  │ Scope interviews, relevance heuristics, JSON │
-│ test_challenger_m2_stress.py  │ 40    │ PASSED  │ Word-boundary regex, talking-head rejection  │
-│ test_synthesis.py             │ 40    │ PASSED  │ 0 Devanagari assertion, syllabus, 3 drills   │
-│ test_diagramming_and_qa.py    │ 72    │ PASSED  │ Monochrome palette, Base-14 fonts, Dual QA   │
+│ test_ingestion_user_specs.py  │ 10    │ PASSED  │ 720p format flags, dynamic frame rate, whisper│
+│ test_cp_ingestion.py          │ 42    │ PASSED  │ Codeforces, LeetCode, AtCoder, oj-api, samples│
+│ test_challenger_m1_*.py       │ 53    │ PASSED  │ Adversarial boundary fuzzing, VTT timing     │
+│ test_grilling.py              │ 35    │ PASSED  │ Scope interviews, relevance heuristics, JSON │
+│ test_challenger_m2_stress.py  │ 36    │ PASSED  │ Word-boundary regex, talking-head rejection  │
+│ test_synthesis.py             │ 73    │ PASSED  │ 0 Devanagari assertion, syllabus, 3 drills   │
+│ test_diagramming_and_qa.py    │ 40    │ PASSED  │ Monochrome palette, Base-14 fonts, Dual QA   │
+│ test_rendering_invariants.py  │ 26    │ PASSED  │ LaTeX macro extinguisher, font-safe floor/ceil│
+│ test_universal_curriculum.py  │ 6     │ PASSED  │ Multi-modal curriculum, English specialization│
+│ test_quotes_and_multiagent.py │ 9     │ PASSED  │ Dynamic quotes library, multi-agent pipeline │
+│ e2e/test_tier*.py             │ 174   │ PASSED  │ 4-tier end-to-end integration & fuzz workloads│
 ├───────────────────────────────┼───────┼─────────┼──────────────────────────────────────────────┤
-│ TOTAL VERIFIED SUITE          │ 453   │ 100%    │ 0 Failures • 0 Regressions • Zero Mock Hacks │
+│ TOTAL VERIFIED SUITE          │ 539   │ 100%    │ 0 Failures • 0 Regressions • Zero Mock Hacks │
 └───────────────────────────────┴───────┴─────────┴──────────────────────────────────────────────┘
 ```
 

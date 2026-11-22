@@ -88,7 +88,7 @@ class MultiAgentOrchestrator:
         # Step 5: ReportLab Engine compiles publication PDF
         output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info(f"[Compiler: ReportLab] Compiling publication-grade PDF to '{output_pdf_path}'...")
-        builder = ReferenceManualBuilder(output_pdf_path, topic=self.topic)
+        builder = ReferenceManualBuilder(output_pdf_path, topic=self.topic, branding="Prepared by @issparsh")
         compiled_path = builder.compile(full_md)
         logger.info(f"[Compiler: ReportLab] Compilation finished: {compiled_path}")
 

@@ -19,6 +19,7 @@ Commands:
   compile   Run only the PDF compiler
   qa        Run only the QA audit on an existing PDF
   clean     Manually trigger post-clearance cleanup
+  explain-math Explain a mathematical topic with academic LaTeX notation & PDF
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import shutil
 import sys
 from dataclasses import asdict
@@ -51,7 +53,7 @@ OUTPUT_DIR = WORKSPACE_ROOT / "output"
 SCRATCH_DIR = WORKSPACE_ROOT / "scratch"
 QA_REPORT_PATH = OUTPUT_DIR / "qa_report.json"
 
-BRANDING = "Prepared by @issparsh @sumitsingh097"
+BRANDING = "Prepared by @issparsh"
 
 # Scratch subdirectories subject to post-clearance wipe
 SCRATCH_SUBDIRS = [
@@ -59,6 +61,7 @@ SCRATCH_SUBDIRS = [
     "audio",        # demuxed WAV / MP3 files
     "videos",       # downloaded 720p MP4 files
     "scrape_html",  # raw scraped HTML pages
+    "assets",       # intermediate extracted images & media
 ]
 
 
@@ -95,7 +98,7 @@ def _save_json(path: Path, data: Dict) -> None:
 def run_ingest(
     sources: List[str],
     corpus_path: Path = CORPUS_PATH,
-    download_video: bool = True,
+    download_video: bool = False,
     ocr_mode: bool = False,
 ) -> Path:
     """
@@ -109,8 +112,13 @@ def run_ingest(
     from scripts.ingestion import run_ingestion
 
     logger.info("Stage 1 — Ingestion starting (%d source(s), download_video=%s, ocr_mode=%s)", len(sources), download_video, ocr_mode)
-    corpus = run_ingestion(sources, output_corpus_path=corpus_path, download_video=download_video, ocr_mode=ocr_mode)
-    logger.info("Corpus written: %s (%d sources)", corpus_path, len(corpus.sources))
+    assets_dir = SCRATCH_DIR / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    corpus = run_ingestion(sources, output_corpus_path=corpus_path, assets_dir=assets_dir, download_video=download_video, ocr_mode=ocr_mode)
+    if not corpus.sources:
+        logger.warning("No sources were successfully ingested into corpus: %s", corpus_path)
+    else:
+        logger.info("Corpus written: %s (%d sources)", corpus_path, len(corpus.sources))
     return corpus_path
 
 
@@ -224,8 +232,26 @@ def run_synthesize(
         logger.info("CP Reference Manual synthesized to: %s (%d bytes)", out_path, len(md_content))
         return out_path
 
+    topic = profile.get("topic", "JavaScript")
+    if topic != "Git" and CORPUS_PATH.exists():
+        import re
+        from scripts.synthesis.corpus_indexer import CorpusIndexer
+        from scripts.synthesis.extractive_notes import ExtractiveNotesSynthesizer
+        indexer = CorpusIndexer(CORPUS_PATH)
+        if indexer.sources and indexer.get_all_spans():
+            synthesizer = ExtractiveNotesSynthesizer(indexer, topic=topic, branding=BRANDING)
+            md_content = synthesizer.generate_markdown()
+            out_dir = Path(output_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            safe_topic = re.sub(r"[^a-zA-Z0-9_-]", "_", topic)
+            out_path = out_dir / f"thenuke_notes_{safe_topic}_{ts}.md"
+            out_path.write_text(md_content, encoding="utf-8")
+            logger.info("Extractive Notes Reference Manual synthesized from corpus: %s (%d bytes)", out_path, len(md_content))
+            return out_path
+
     config = SynthesisConfig(
-        topic=profile.get("topic", "JavaScript"),
+        topic=topic,
         level_of_detail=profile.get("level_of_detail", "senior_architect"),
         visual_threshold=profile.get("visual_threshold", "strict_need_based"),
         audience_focus=profile.get("audience_focus", "faang_interview"),
@@ -261,7 +287,7 @@ def run_compile(
     pdf_path = output_dir / f"thenuke_manual_{ts}.pdf"
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
-    builder = ReferenceManualBuilder(pdf_path, topic=topic)
+    builder = ReferenceManualBuilder(pdf_path, topic=topic, branding=branding)
     out = builder.compile(md_text)
     logger.info("Publication-grade PDF compiled: %s", out)
     return out
@@ -301,22 +327,22 @@ def run_multi_agent(
         logger.error("Adversarial QA Gate reported issues: %s", report.issues)
     else:
         logger.info("Multi-Agent Publication Manual Ready: %s", compiled_pdf)
-    return compiled_pdf
+    return compiled_pdf, report
 
 
 # ---------------------------------------------------------------------------
 # Stage 5 — QA Audit
 # ---------------------------------------------------------------------------
 
-def run_qa(pdf_path: Path, report_path: Path = QA_REPORT_PATH) -> bool:
+def run_qa(pdf_path: Path, report_path: Path = QA_REPORT_PATH, profile: str = "auto") -> bool:
     """
     Run the dual-pass QA audit on the compiled PDF.
     Returns True if the audit passes.
     """
     from scripts.qa.qa_audit_engine import run_qa_audit
 
-    logger.info("Stage 5 — QA Audit starting: %s", pdf_path)
-    report = run_qa_audit(pdf_path, output_report_path=report_path)
+    logger.info("Stage 5 — QA Audit starting (%s profile): %s", profile, pdf_path)
+    report = run_qa_audit(pdf_path, output_report_path=report_path, profile=profile)
     logger.info("QA Audit: %s", report.summary)
 
     if not report.overall_passed:
@@ -338,6 +364,7 @@ def run_cleanup(scratch_dir: Path = SCRATCH_DIR, confirm: bool = True) -> None:
     - Extracted video frames
     - Demuxed WAV audio files
     - Raw scraped HTML pages
+    - Intermediate extracted assets
 
     This is irreversible. Confirmation required unless `confirm=False`.
     """
@@ -349,6 +376,10 @@ def run_cleanup(scratch_dir: Path = SCRATCH_DIR, confirm: bool = True) -> None:
             if p.exists():
                 size_mb = sum(f.stat().st_size for f in p.rglob("*") if f.is_file()) / (1024 * 1024)
                 print(f"  {p}  ({size_mb:.1f} MB)")
+        cwd_assets = Path("assets")
+        if cwd_assets.exists() and cwd_assets.is_dir():
+            size_mb = sum(f.stat().st_size for f in cwd_assets.rglob("*") if f.is_file()) / (1024 * 1024)
+            print(f"  {cwd_assets.resolve()}  ({size_mb:.1f} MB)")
         response = input("\nType 'DELETE' to confirm permanent deletion: ").strip()
         if response != "DELETE":
             print("Cleanup aborted.")
@@ -359,6 +390,11 @@ def run_cleanup(scratch_dir: Path = SCRATCH_DIR, confirm: bool = True) -> None:
         if p.exists():
             shutil.rmtree(p, ignore_errors=True)
             logger.info("Deleted: %s", p)
+
+    cwd_assets = Path("assets")
+    if cwd_assets.exists() and cwd_assets.is_dir():
+        shutil.rmtree(cwd_assets, ignore_errors=True)
+        logger.info("Deleted legacy CWD: %s", cwd_assets)
 
     logger.info("Post-clearance cleanup complete.")
 
@@ -372,7 +408,7 @@ def run_full_pipeline(
     non_interactive: bool = False,
     preset: Optional[str] = None,
     skip_cleanup_prompt: bool = False,
-    download_video: bool = True,
+    download_video: bool = False,
     ocr_mode: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -407,7 +443,9 @@ def run_full_pipeline(
     artifacts["pdf"] = str(pdf_path)
 
     # Stage 5
-    qa_passed = run_qa(pdf_path)
+    is_cp = bool(profile_data.get("cp_problem"))
+    qa_profile = "cp" if is_cp else ("git" if topic == "Git" else "auto")
+    qa_passed = run_qa(pdf_path, profile=qa_profile)
     artifacts["qa_passed"] = qa_passed
     artifacts["qa_report"] = str(QA_REPORT_PATH)
 
@@ -442,7 +480,8 @@ def build_parser() -> argparse.ArgumentParser:
     # run — full pipeline
     run_p = sub.add_parser("run", help="Full pipeline: ingest → grill → synthesize → compile → qa")
     run_p.add_argument("sources", nargs="+", help="URLs or local file paths to ingest")
-    run_p.add_argument("--subtitles-only", action="store_true", help="Fast path: ingest subtitles only (2s), skip 720p video stream download")
+    run_p.add_argument("--download-video", action="store_true", default=False, help="Download 720p video stream and extract frames (slow, disk-heavy; default is subtitles-only fast path)")
+    run_p.add_argument("--subtitles-only", action="store_true", default=False, help="Fast path: ingest subtitles only (default)")
     run_p.add_argument("--ocr-frames", action="store_true", help="Use programmatic OCR on video frames instead of AI multimodal visual self-analysis (recommended for long videos > 2h to save context tokens)")
     run_p.add_argument("--non-interactive", action="store_true", help="Skip interactive grilling; use preset")
     run_p.add_argument("--preset", default=None, help="Grilling preset name (e.g. senior_architect_faang)")
@@ -451,7 +490,8 @@ def build_parser() -> argparse.ArgumentParser:
     # ingest
     ingest_p = sub.add_parser("ingest", help="Run ingestion only")
     ingest_p.add_argument("sources", nargs="+", help="URLs or file paths")
-    ingest_p.add_argument("--subtitles-only", action="store_true", help="Fast path: ingest subtitles only (2s), skip 720p video stream download")
+    ingest_p.add_argument("--download-video", action="store_true", default=False, help="Download 720p video stream and extract frames (default is subtitles-only fast path)")
+    ingest_p.add_argument("--subtitles-only", action="store_true", default=False, help="Fast path: ingest subtitles only (default)")
     ingest_p.add_argument("--ocr-frames", action="store_true", help="Use programmatic OCR on video frames instead of AI multimodal visual self-analysis (recommended for long videos > 2h to save context tokens)")
 
     # grill
@@ -472,6 +512,7 @@ def build_parser() -> argparse.ArgumentParser:
     qa_p = sub.add_parser("qa", help="QA audit only on existing PDF")
     qa_p.add_argument("pdf", help="Path to compiled PDF")
     qa_p.add_argument("--report", default=str(QA_REPORT_PATH))
+    qa_p.add_argument("--profile", default="auto", choices=["auto", "git", "js", "cp", "notes"], help="QA Profile to evaluate against")
     qa_p.add_argument("--strict", action="store_true", help="Fail on warnings too")
 
     # clean
@@ -484,6 +525,29 @@ def build_parser() -> argparse.ArgumentParser:
     ma_p.add_argument("--output", default=None, help="Target PDF path")
     ma_p.add_argument("--interactive", action="store_true", help="Run interactive /grill-me clarification interview")
 
+    # fetch-problem — CP Problem Ingestion
+    fp_p = sub.add_parser("fetch-problem", help="Fetch a competitive programming problem with full math & samples")
+    fp_p.add_argument("url", help="Problem URL (Codeforces, LeetCode, AtCoder, CodeChef, HackerRank, GFG, InterviewBit)")
+    fp_p.add_argument("--output", "-o", default=None, help="Output path for structured Markdown or JSON")
+    fp_p.add_argument("--json", action="store_true", help="Output raw JSON metadata instead of Markdown")
+
+    # compile-git — compile canonical Git reference manual
+    # compile-git — compile canonical Git reference manual
+    cg_p = sub.add_parser("compile-git", help="Compile the canonical Git: Architecture & Internals reference manual")
+    cg_p.add_argument("--output", "-o", default=None, help="Target output PDF path")
+
+    # ingest-notes — grounded extractive notes pipeline
+    in_p = sub.add_parser("ingest-notes", help="Ingest multi-modal resources and compile grounded extractive notes")
+    in_p.add_argument("sources", nargs="+", help="URLs or local file paths to ingest")
+    in_p.add_argument("--topic", default="Engineering Reference", help="Manual topic title")
+    in_p.add_argument("--output", "-o", default=None, help="Target output PDF path")
+
+    # explain-math — Mathematical Explanation & Professional Typesetting
+    em_p = sub.add_parser("explain-math", help="Generate professionally typeset mathematical notes and compile to PDF")
+    em_p.add_argument("topic", nargs="?", default="conditional-probability", help="Mathematical topic or query")
+    em_p.add_argument("--output", "-o", default=None, help="Target output PDF path")
+    em_p.add_argument("--markdown", action="store_true", help="Print generated Markdown to stdout")
+
     return parser
 
 
@@ -493,30 +557,35 @@ def main() -> None:
 
     if args.command == "multi-agent":
         out_path = Path(args.output) if args.output else None
-        pdf_path = run_multi_agent(
+        pdf_path, report = run_multi_agent(
             topic=args.topic,
             output_path=out_path,
             interactive=args.interactive,
         )
         print(f"Multi-Agent Publication PDF: {pdf_path}")
+        if not getattr(report, "passed", True):
+            logger.error("Multi-Agent QA Audit failed: %s", getattr(report, "issues", "Defects detected"))
+            sys.exit(1)
         sys.exit(0)
 
     elif args.command == "run":
+        download_video = getattr(args, "download_video", False) and not getattr(args, "subtitles_only", False)
         result = run_full_pipeline(
             sources=args.sources,
             non_interactive=args.non_interactive,
             preset=args.preset,
             skip_cleanup_prompt=args.skip_cleanup,
-            download_video=not getattr(args, "subtitles_only", False),
+            download_video=download_video,
             ocr_mode=getattr(args, "ocr_frames", False),
         )
         print(json.dumps(result, indent=2))
         sys.exit(0 if result.get("status") == "COMPLETE" else 1)
 
     elif args.command == "ingest":
+        download_video = getattr(args, "download_video", False) and not getattr(args, "subtitles_only", False)
         corpus = run_ingest(
             args.sources,
-            download_video=not getattr(args, "subtitles_only", False),
+            download_video=download_video,
             ocr_mode=getattr(args, "ocr_frames", False),
         )
         print(f"Corpus: {corpus}")
@@ -538,7 +607,7 @@ def main() -> None:
     elif args.command == "qa":
         pdf_path = Path(args.pdf)
         from scripts.qa.qa_audit_engine import run_qa_audit
-        report = run_qa_audit(pdf_path, output_report_path=Path(args.report))
+        report = run_qa_audit(pdf_path, output_report_path=Path(args.report), profile=args.profile)
         print(report.summary)
         if not report.overall_passed:
             sys.exit(1)
@@ -547,6 +616,78 @@ def main() -> None:
 
     elif args.command == "clean":
         run_cleanup(SCRATCH_DIR, confirm=not args.yes)
+
+    elif args.command == "fetch-problem":
+        from scripts.ingestion.cp_problem import extract_cp_problem
+        problem = extract_cp_problem(args.url)
+        if args.json:
+            out_str = json.dumps(problem.to_dict(), indent=2)
+        else:
+            out_str = problem.to_structured_markdown()
+        if args.output:
+            out_p = Path(args.output)
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_text(out_str, encoding="utf-8")
+            print(f"Saved problem to {out_p}")
+        else:
+            print(out_str)
+        sys.exit(0)
+
+    elif args.command == "compile-git":
+        out_path = Path(args.output) if args.output else None
+        pdf_path, report = run_multi_agent(topic="Git", output_path=out_path)
+        print(f"Git Reference Manual PDF: {pdf_path}")
+        sys.exit(0 if getattr(report, "passed", True) else 1)
+
+    elif args.command == "ingest-notes":
+        from scripts.synthesis.corpus_indexer import CorpusIndexer
+        from scripts.synthesis.extractive_notes import ExtractiveNotesSynthesizer
+        from scripts.diagramming.reportlab_engine import ReferenceManualBuilder
+        from scripts.qa.qa_audit_engine import run_qa_audit
+
+        corpus_p = run_ingest(args.sources, download_video=False)
+        indexer = CorpusIndexer(corpus_p)
+        if not indexer.sources:
+            logger.error("No sources were ingested.")
+            sys.exit(1)
+
+        synthesizer = ExtractiveNotesSynthesizer(indexer, topic=args.topic, branding=BRANDING)
+        md_text = synthesizer.generate_markdown()
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        safe_topic = re.sub(r"[^a-zA-Z0-9_-]", "_", args.topic)
+        md_p = OUTPUT_DIR / f"thenuke_notes_{safe_topic}_{ts}.md"
+        md_p.parent.mkdir(parents=True, exist_ok=True)
+        md_p.write_text(md_text, encoding="utf-8")
+
+        out_pdf = Path(args.output) if args.output else OUTPUT_DIR / f"{safe_topic}_Notes_{ts}.pdf"
+        builder = ReferenceManualBuilder(out_pdf, topic=args.topic, branding=BRANDING)
+        pdf_out = builder.compile(md_text)
+
+        report = run_qa_audit(pdf_out, profile="notes")
+        print(report.summary)
+        print(f"Extractive Notes PDF: {pdf_out}")
+        sys.exit(0 if report.overall_passed else 1)
+
+    elif args.command == "explain-math":
+        from scripts.synthesis.math_explainer import explain_math_topic
+        from scripts.diagramming.reportlab_engine import ReferenceManualBuilder
+        from scripts.qa.qa_audit_engine import run_qa_audit
+
+        topic_clean = args.topic.strip()
+        md_text = explain_math_topic(topic_clean, branding=BRANDING)
+        if args.markdown:
+            print(md_text)
+
+        safe_topic = re.sub(r"[^a-zA-Z0-9_-]", "_", topic_clean)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        out_pdf = Path(args.output) if args.output else OUTPUT_DIR / f"{safe_topic}_Reference_Manual_{ts}.pdf"
+        builder = ReferenceManualBuilder(out_pdf, topic=topic_clean.replace("-", " ").title(), branding=BRANDING)
+        pdf_out = builder.compile(md_text)
+
+        report = run_qa_audit(pdf_out, profile="math")
+        print(report.summary)
+        print(f"Math Reference Manual PDF: {pdf_out}")
+        sys.exit(0 if report.overall_passed else 1)
 
 
 if __name__ == "__main__":

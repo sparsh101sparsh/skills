@@ -46,7 +46,7 @@ _CHALLENGE_BLOCK_RE = re.compile(
 )
 
 _BRANDING_RE = re.compile(
-    r"@issparsh\s+@sumitsingh097",
+    r"@issparsh(?:\s+@sumitsingh097)?",
     re.IGNORECASE,
 )
 
@@ -98,6 +98,7 @@ class Pass2TextualResult:
     passed: bool
     error_count: int
     warning_count: int
+    rendering_violations: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -242,7 +243,28 @@ def run_pass1_visual(pdf_path: Path, dpi: int = 150) -> Pass1VisualResult:
     all_defects: List[PageDefect] = []
 
     for page in pages:
+        pix = _rasterize_page(page, dpi=150)
+        if pix.width == 0 or pix.height == 0:
+            all_defects.append(PageDefect(
+                page_number=page.number + 1,
+                defect_type="rasterization_failure",
+                description="Page failed to rasterize at 150 DPI.",
+                severity="error",
+            ))
         all_defects.extend(_detect_text_overflow(page))
+
+        # Blank page detection (non-cover pages)
+        if page.number > 0:
+            blocks = [b for b in page.get_text("blocks") if 50.0 <= b[1] <= 790.0]
+            drawings = [d for d in page.get_drawings() if 50.0 <= d["rect"].y0 <= 790.0]
+            if len(blocks) == 0 and len(drawings) == 0:
+                all_defects.append(PageDefect(
+                    page_number=page.number + 1,
+                    defect_type="blank_page",
+                    description="Ghost blank page detected (zero body flowables or drawings).",
+                    severity="error",
+                    remediation="Remove redundant PageBreak flowable or combine Part with Module opener.",
+                ))
 
     all_defects.extend(_detect_orphan_headers(pages))
     doc.close()
@@ -263,8 +285,8 @@ def run_pass1_visual(pdf_path: Path, dpi: int = 150) -> Pass1VisualResult:
 # Pass 2: Textual Quality Audit
 # ---------------------------------------------------------------------------
 
-def run_pass2_textual(pdf_path: Path) -> Pass2TextualResult:
-    """Execute Pass 2: Textual Quality Audit on the compiled PDF."""
+def run_pass2_textual(pdf_path: Path, profile: str = "auto") -> Pass2TextualResult:
+    """Execute Pass 2: Textual Quality Audit on the compiled PDF across dedicated profiles."""
     full_text = ""
     try:
         import fitz
@@ -303,34 +325,125 @@ def run_pass2_textual(pdf_path: Path) -> Pass2TextualResult:
     # ES2024+ signals
     found_signals = [sig for sig in _ES2024_SIGNALS if sig in full_text]
 
-    # Competitive programming reference manual detection
-    is_cp_problem = (
-        "Competitive Programming" in full_text
-        or ":::sample" in full_text
-        or "Platform:" in full_text
-        or "Time Limit:" in full_text
-    )
+    # Determine active profile
+    prof = profile.lower()
+    if prof == "auto":
+        if (
+            "Competitive Programming" in full_text
+            or ":::sample" in full_text
+            or "Platform:" in full_text
+            or "Time Limit:" in full_text
+            or "Sample Tests & Verification" in full_text
+        ):
+            prof = "cp"
+        elif "git" in full_text.lower() and ("reflog" in full_text.lower() or "packfile" in full_text.lower() or "lca" in full_text.lower()):
+            prof = "git"
+        elif "extractive notes" in full_text.lower() or "source tape" in full_text.lower():
+            prof = "notes"
+        elif "probability theory" in full_text.lower() or "academic reference manual" in full_text.lower() or "mathematical engineering" in full_text.lower():
+            prof = "math"
+        else:
+            prof = "general"
 
-    # Error & warning tallies
+    is_cp = (prof == "cp")
+    is_notes = (prof == "notes")
+    is_math = (prof == "math")
+
+    # Rendering Invariants Verification
+    escape_hits = [
+        f"Literal escape artifact '{m.group()}' at pos {m.start()}"
+        for m in re.finditer(r"\\n\s*[-*•]", full_text)
+    ]
+    placeholder_hits = [
+        f"Leaked internal placeholder '{m.group()}' at pos {m.start()}"
+        for m in re.finditer(r"___(?:CODE|MATH|PRE_CODE|CURRENCY|LONE_DOLLAR|ESCAPED_DOLLAR)_PH_\d+___|___[A-Z_]+___", full_text)
+    ]
+    delimiter_hits = [
+        f"Unrendered math delimiter marker '$$$' at pos {m.start()}"
+        for m in re.finditer(r"\$\$\$", full_text)
+    ]
+    latex_macro_hits = [
+        f"Unrendered LaTeX macro '{m.group()}' at pos {m.start()}"
+        for m in re.finditer(
+            r"\\(?:le|leq|ge|geq|ne|neq|notin|frac|sqrt|sum|prod|oplus|otimes|odot|cdots|ldots|vdots|ddots|implies|iff|to|gets|pmod|bmod|gcd|lcm|lfloor|rfloor|lceil|rceil|text|textasciicircum|textasciitilde|mathbf|mathbb|mathcal|mathit|mathrm|mathtt|qquad|quad|alpha|beta|gamma|delta|lambda|pi|sigma|omega|theta|binom|choose|overline|underline|begin|end)\b",
+            full_text,
+        )
+    ]
+    symbol_leak_hits = [
+        f"Unrendered escaped symbol '{m.group()}' at pos {m.start()}"
+        for m in re.finditer(r"\\[%_&#]", full_text)
+    ]
+    tofu_hits = [
+        f"Broken/Tofu character '{m.group()}' (U+{ord(m.group()):04X}) at pos {m.start()}"
+        for m in re.finditer(r"[\ufffd\u25a0\u25aa\u25ab]", full_text)
+    ]
+    informal_math_hits = [
+        f"Informal linear math approximation '{m.group()}' at pos {m.start()}"
+        for m in re.finditer(
+            r"\bP\([A-Za-z]\s*/\s*[A-Za-z]\)\s*=|"
+            r"\bP\([A-Za-z]\s*\|\s*[A-Za-z]\)\s*=\s*P\([A-Za-z]\s*[A-Za-z]\)\s*/\s*P\([A-Za-z]\)|"
+            r"\bsum\s*\([a-z]\s*=\s*\d+\s+to\s+[a-z0-9]+\)|"
+            r"\bintegral\s+[a-zA-Z]\([a-zA-Z]\)\s*d[a-zA-Z]|"
+            r"\blim\s*\([a-z]\s*->\s*\d+\)",
+            full_text,
+            re.IGNORECASE,
+        )
+    ]
+    forbidden_patterns = [
+        re.compile(r"\bsriniously\b", re.IGNORECASE),
+        re.compile(r"\bchai\s+aur\s+code\b", re.IGNORECASE),
+        re.compile(r"\bsheryians\b", re.IGNORECASE),
+        re.compile(r"\bhitesh\b", re.IGNORECASE),
+        re.compile(r"\bharsh\b", re.IGNORECASE),
+        re.compile(r"\bharry\b", re.IGNORECASE),
+        re.compile(r"\bdsthakurrawat\b", re.IGNORECASE),
+    ]
+    forbidden_hits = [
+        f"Forbidden name '{m.group()}' at pos {m.start()}"
+        for pat in forbidden_patterns
+        for m in pat.finditer(full_text)
+    ]
+    rendering_hits = escape_hits + placeholder_hits + delimiter_hits + latex_macro_hits + symbol_leak_hits + tofu_hits + informal_math_hits + forbidden_hits
+
     errors = 0
     warnings = 0
 
     if devanagari_hits:
         errors += len(devanagari_hits)
-    if not has_syllabus and not is_cp_problem:
+    if rendering_hits:
+        errors += len(rendering_hits)
+    if not branding_found:
         errors += 1
-    if not is_cp_problem:
+
+    if prof == "git":
+        if not has_syllabus:
+            errors += 1
+        if phase_count < 9:
+            warnings += 1
+        if challenge_count < 25:
+            warnings += 1
+    elif prof == "notes":
+        if len(full_text.strip()) < 50:
+            errors += 1
+    elif prof == "math":
+        if len(full_text.strip()) < 50:
+            errors += 1
+    elif prof == "cp":
+        has_samples = bool(re.search(r":::sample|\bInput\b|\bSample (?:Input|Tests)\b", full_text))
+        if not has_samples:
+            warnings += 1
+    else:  # general / js
+        if not has_syllabus:
+            errors += 1
         if phase_count < 3:
             warnings += 1
         if challenge_count < 3:
             warnings += 1
-    if not branding_found:
-        errors += 1
 
     return Pass2TextualResult(
         total_text_length=len(full_text),
         devanagari_violations=devanagari_hits[:20],  # cap to 20 for report size
-        has_syllabus_index=has_syllabus or is_cp_problem,
+        has_syllabus_index=has_syllabus or is_cp or is_notes or is_math,
         phase_count_detected=phase_count,
         challenge_blocks_detected=challenge_count,
         branding_found=branding_found,
@@ -338,6 +451,7 @@ def run_pass2_textual(pdf_path: Path) -> Pass2TextualResult:
         passed=(errors == 0),
         error_count=errors,
         warning_count=warnings,
+        rendering_violations=rendering_hits[:20],
     )
 
 
@@ -345,13 +459,14 @@ def run_pass2_textual(pdf_path: Path) -> Pass2TextualResult:
 # Full QA Audit Orchestrator
 # ---------------------------------------------------------------------------
 
-def run_qa_audit(pdf_path: Path | str, output_report_path: Optional[Path | str] = None) -> QAReport:
+def run_qa_audit(pdf_path: Path | str, output_report_path: Optional[Path | str] = None, profile: str = "auto") -> QAReport:
     """
-    Run the full dual-pass QA audit on a compiled PDF.
+    Run the full dual-pass QA audit on a compiled PDF across a specified profile.
 
     Args:
         pdf_path: Path to the compiled PDF (or .md file for unit testing).
         output_report_path: Optional path to write qa_report.json.
+        profile: QA profile ("git", "js", "cp", "notes", "auto").
 
     Returns:
         QAReport dataclass with complete audit results.
@@ -363,8 +478,8 @@ def run_qa_audit(pdf_path: Path | str, output_report_path: Optional[Path | str] 
     logger.info("Pass 1 — Visual & Structural QA: %s", pdf_path)
     pass1 = run_pass1_visual(pdf_path)
 
-    logger.info("Pass 2 — Textual Quality Audit: %s", pdf_path)
-    pass2 = run_pass2_textual(pdf_path)
+    logger.info("Pass 2 — Textual Quality Audit (%s profile): %s", profile, pdf_path)
+    pass2 = run_pass2_textual(pdf_path, profile=profile)
 
     overall = pass1.passed and pass2.passed
 
